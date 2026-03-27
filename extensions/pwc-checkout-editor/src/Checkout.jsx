@@ -1,6 +1,6 @@
 import '@shopify/ui-extensions/preact';
 import {render} from "preact";
-import {useEffect, useMemo, useState} from "preact/hooks";
+import {useEffect, useState} from "preact/hooks";
 
 export default async () => {
   render(<Extension />, document.body);
@@ -13,7 +13,6 @@ function Extension() {
   const shippingAddress = shopify.shippingAddress?.value;
   const notesEnabled = instructions?.notes?.canUpdateNote === true;
 
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(30 * 60);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -29,6 +28,7 @@ function Extension() {
   const [modalQty, setModalQty] = useState("1");
   const [modalSize, setModalSize] = useState("XS");
   const [showOfferStep, setShowOfferStep] = useState(false);
+  const [variantImageUrl, setVariantImageUrl] = useState("");
 
   const configuredUpsellVariantId = shopify.settings?.current?.upsell_variant_id ?? "";
   const upsellTitle = shopify.settings?.current?.upsell_title ?? "Featured item";
@@ -42,21 +42,81 @@ function Extension() {
     : !canAddLines
       ? "This checkout does not allow cart line additions at this step."
       : "";
+  const normalizedCountryCode = countryCode.trim().toUpperCase();
+  const shippingValidationError =
+    normalizedCountryCode && !/^[A-Z]{2}$/.test(normalizedCountryCode)
+      ? "Country code must be 2 letters (for example: US, AU, IN)."
+      : "";
+  const discountValidationError =
+    discountCode.trim() && discountCode.trim().length < 3
+      ? "Discount code looks too short."
+      : "";
+  const giftCardValidationError =
+    giftCardCode.trim() && giftCardCode.trim().length < 6
+      ? "Gift card code looks too short."
+      : "";
+  const addQtyNumber = Number(addQty || 0);
+  const addQtyValidationError =
+    !Number.isInteger(addQtyNumber) || addQtyNumber < 1 || addQtyNumber > 10
+      ? "Quantity must be a whole number between 1 and 10."
+      : "";
+  const modalQtyNumber = Number(modalQty || 0);
+  const modalQtyValidationError =
+    !Number.isInteger(modalQtyNumber) || modalQtyNumber < 1 || modalQtyNumber > 10
+      ? "Quantity must be a whole number between 1 and 10."
+      : "";
+  const lineQtyNumber = Number(lineQty || 0);
+  const lineQtyValidationError =
+    !Number.isInteger(lineQtyNumber) || lineQtyNumber < 0 || lineQtyNumber > 99
+      ? "Line quantity must be a whole number between 0 and 99."
+      : "";
+  const noteValidationError =
+    orderNote.length > 500 ? "Order note must be 500 characters or fewer." : "";
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeftSeconds((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    let cancelled = false;
 
-  const timeText = useMemo(() => {
-    const minutes = Math.floor(timeLeftSeconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const seconds = (timeLeftSeconds % 60).toString().padStart(2, "0");
-    return `${minutes}:${seconds}`;
-  }, [timeLeftSeconds]);
+    async function loadVariantImage() {
+      if (!effectiveUpsellVariantId) {
+        setVariantImageUrl("");
+        return;
+      }
+
+      try {
+        const response = await shopify.query(
+          `#graphql
+            query VariantImage($id: ID!) {
+              node(id: $id) {
+                ... on ProductVariant {
+                  image {
+                    url
+                  }
+                  product {
+                    featuredImage {
+                      url
+                    }
+                  }
+                }
+              }
+            }`,
+          {variables: {id: effectiveUpsellVariantId}},
+        );
+        const data = /** @type {any} */ (response?.data);
+        const image =
+          data?.node?.image?.url ??
+          data?.node?.product?.featuredImage?.url ??
+          "";
+        if (!cancelled) setVariantImageUrl(image);
+      } catch {
+        if (!cancelled) setVariantImageUrl("");
+      }
+    }
+
+    loadVariantImage();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveUpsellVariantId]);
 
   async function runAction(fn, okMessage, errorPrefix = "Action failed") {
     setLoading(true);
@@ -74,12 +134,7 @@ function Extension() {
   return (
     <s-box padding="base" border="base" borderRadius="base">
       <s-stack gap="base">
-        <s-stack direction="inline" inlineAlignment="space-between">
-          <s-heading>Edit your checkout</s-heading>
-          <s-text tone={timeLeftSeconds < 120 ? "critical" : "subdued"}>
-            {timeText} left to edit
-          </s-text>
-        </s-stack>
+        <s-heading>Edit your checkout</s-heading>
 
         <s-details summary="Edit shipping address">
           <s-stack gap="small">
@@ -108,7 +163,7 @@ function Extension() {
                     address: {
                       zip: zip || undefined,
                       city: city || undefined,
-                      countryCode: countryCode || undefined,
+                      countryCode: normalizedCountryCode || undefined,
                     },
                   });
                   if (result.type === "error") {
@@ -119,6 +174,9 @@ function Extension() {
             >
               Save shipping address
             </s-button>
+            {shippingValidationError && (
+              <s-banner tone="warning">{shippingValidationError}</s-banner>
+            )}
             {!instructions.delivery.canSelectCustomAddress && (
               <s-banner tone="warning">Shipping address changes are not available for this checkout.</s-banner>
             )}
@@ -135,7 +193,12 @@ function Extension() {
             <s-stack direction="inline" gap="small">
               <s-button
                 variant="secondary"
-                disabled={!instructions.discounts.canUpdateDiscountCodes || !discountCode || loading}
+                disabled={
+                  !instructions.discounts.canUpdateDiscountCodes ||
+                  !discountCode.trim() ||
+                  Boolean(discountValidationError) ||
+                  loading
+                }
                 onClick={() =>
                   runAction(async () => {
                     const result = await shopify.applyDiscountCodeChange({
@@ -166,6 +229,9 @@ function Extension() {
                 Remove last code
               </s-button>
             </s-stack>
+            {discountValidationError && (
+              <s-banner tone="warning">{discountValidationError}</s-banner>
+            )}
           </s-stack>
         </s-details>
 
@@ -178,7 +244,7 @@ function Extension() {
             />
             <s-button
               variant="secondary"
-              disabled={!giftCardCode || loading}
+              disabled={!giftCardCode.trim() || Boolean(giftCardValidationError) || loading}
               onClick={() =>
                 runAction(async () => {
                   const result = await shopify.applyGiftCardChange({
@@ -191,6 +257,9 @@ function Extension() {
             >
               Apply gift card
             </s-button>
+            {giftCardValidationError && (
+              <s-banner tone="warning">{giftCardValidationError}</s-banner>
+            )}
           </s-stack>
         </s-details>
 
@@ -203,7 +272,7 @@ function Extension() {
             />
             <s-button
               variant="secondary"
-              disabled={!notesEnabled || loading}
+              disabled={!notesEnabled || Boolean(noteValidationError) || loading}
               onClick={() =>
                 runAction(async () => {
                   const result = await shopify.applyNoteChange({
@@ -216,16 +285,19 @@ function Extension() {
             >
               Save note
             </s-button>
+            {noteValidationError && (
+              <s-banner tone="warning">{noteValidationError}</s-banner>
+            )}
             {!notesEnabled && <s-banner tone="warning">Order notes cannot be edited in this checkout.</s-banner>}
           </s-stack>
         </s-details>
 
         <s-details summary="Add a product to your order">
           <s-stack gap="small">
-            <s-text tone="subdued">
+            <s-text tone="neutral">
               Configure `upsell_variant_id` in settings, or this uses the first cart line variant.
             </s-text>
-            <s-text tone="subdued">
+            <s-text tone="neutral">
               Effective variant: {effectiveUpsellVariantId || "none"}
             </s-text>
             <s-number-field
@@ -236,13 +308,18 @@ function Extension() {
             />
             <s-button
               variant="secondary"
-              disabled={!canAddLines || !effectiveUpsellVariantId || loading}
+              disabled={
+                !canAddLines ||
+                !effectiveUpsellVariantId ||
+                Boolean(addQtyValidationError) ||
+                loading
+              }
               onClick={() =>
                 runAction(async () => {
                   const result = await shopify.applyCartLinesChange({
                     type: "addCartLine",
                     merchandiseId: effectiveUpsellVariantId,
-                    quantity: Math.max(1, Number(addQty || 1)),
+                    quantity: addQtyNumber,
                   });
                   if (result.type === "error") throw new Error(result.message);
                 }, "Product added to checkout")
@@ -250,30 +327,40 @@ function Extension() {
             >
               Add configured upsell product
             </s-button>
+            {addQtyValidationError && (
+              <s-banner tone="warning">{addQtyValidationError}</s-banner>
+            )}
           </s-stack>
         </s-details>
 
         <s-box border="base" borderRadius="base" padding="base">
           <s-stack gap="base">
             <s-heading>Add the finishing touch</s-heading>
-            <s-stack direction="inline" gap="base" blockAlignment="center">
-              {upsellImage ? (
-                <s-image source={upsellImage} />
+            <s-stack direction="inline" gap="base">
+              {variantImageUrl || upsellImage ? (
+                <s-box border="base" borderRadius="small" padding="small">
+                  <s-image src={variantImageUrl || upsellImage} />
+                </s-box>
               ) : (
                 <s-box border="base" borderRadius="small" padding="base">
-                  <s-text tone="subdued">Image</s-text>
+                  <s-text tone="neutral">Image</s-text>
                 </s-box>
               )}
               <s-stack gap="none">
                 <s-text>{upsellTitle}</s-text>
                 {upsellPrice ? (
-                  <s-text tone="subdued">{upsellPrice}</s-text>
+                  <s-text tone="neutral">{upsellPrice}</s-text>
                 ) : (
-                  <s-text tone="subdued">Set `upsell_price` in extension settings</s-text>
+                  <s-text tone="neutral">Set `upsell_price` in extension settings</s-text>
                 )}
               </s-stack>
               <s-button
-                disabled={!canAddLines || !effectiveUpsellVariantId || loading}
+                disabled={
+                  !canAddLines ||
+                  !effectiveUpsellVariantId ||
+                  Boolean(addQtyValidationError) ||
+                  loading
+                }
                 onClick={() => setShowOfferStep(true)}
               >
                 Add
@@ -286,9 +373,9 @@ function Extension() {
         </s-box>
 
         {showOfferStep && (
-          <s-box border="base" borderRadius="base" padding="base">
+          <s-box border="base" borderRadius="base" padding="base" background="subdued">
           <s-stack gap="base">
-            <s-stack direction="inline" inlineAlignment="space-between">
+            <s-stack direction="inline">
               <s-heading>Add product to your order</s-heading>
               <s-button variant="secondary" onClick={() => setShowOfferStep(false)}>
                 Close
@@ -296,13 +383,13 @@ function Extension() {
             </s-stack>
 
             <s-box border="base" borderRadius="small" padding="small">
-              <s-stack direction="inline" gap="small" blockAlignment="center">
-                {upsellImage ? (
-                  <s-image source={upsellImage} />
+              <s-stack direction="inline" gap="small">
+                {variantImageUrl || upsellImage ? (
+                  <s-image src={variantImageUrl || upsellImage} />
                 ) : null}
                 <s-stack gap="none">
                   <s-text>{upsellTitle}</s-text>
-                  {upsellPrice ? <s-text tone="subdued">{upsellPrice}</s-text> : null}
+                  {upsellPrice ? <s-text tone="neutral">{upsellPrice}</s-text> : null}
                 </s-stack>
               </s-stack>
             </s-box>
@@ -331,13 +418,18 @@ function Extension() {
 
             <s-button
               variant="primary"
-              disabled={!canAddLines || !effectiveUpsellVariantId || loading}
+              disabled={
+                !canAddLines ||
+                !effectiveUpsellVariantId ||
+                Boolean(modalQtyValidationError) ||
+                loading
+              }
               onClick={() =>
                 runAction(async () => {
                   const result = await shopify.applyCartLinesChange({
                     type: "addCartLine",
                     merchandiseId: effectiveUpsellVariantId,
-                    quantity: Math.max(1, Number(modalQty || 1)),
+                    quantity: modalQtyNumber,
                     attributes: [{key: "selected_size", value: modalSize}],
                   });
                   if (result.type === "error") throw new Error(result.message);
@@ -347,7 +439,10 @@ function Extension() {
             >
               Yes, add to my order
             </s-button>
-            <s-text tone="subdued">
+            {modalQtyValidationError && (
+              <s-banner tone="warning">{modalQtyValidationError}</s-banner>
+            )}
+            <s-text tone="neutral">
               Adding this product may qualify the order for better shipping offers.
             </s-text>
           </s-stack>
@@ -363,7 +458,7 @@ function Extension() {
               <s-box border="base" borderRadius="small" padding="small">
                 <s-stack gap="small">
                   {cartLines.length === 0 ? (
-                    <s-text tone="subdued">No cart lines found.</s-text>
+                    <s-text tone="neutral">No cart lines found.</s-text>
                   ) : (
                     cartLines.map((line) => (
                       <s-button
@@ -387,13 +482,18 @@ function Extension() {
             <s-stack direction="inline" gap="small">
               <s-button
                 variant="secondary"
-                disabled={!instructions.lines.canUpdateCartLine || !lineId || loading}
+                disabled={
+                  !instructions.lines.canUpdateCartLine ||
+                  !lineId ||
+                  Boolean(lineQtyValidationError) ||
+                  loading
+                }
                 onClick={() =>
                   runAction(async () => {
                     const result = await shopify.applyCartLinesChange({
                       type: "updateCartLine",
                       id: lineId,
-                      quantity: Math.max(0, Number(lineQty || 0)),
+                      quantity: lineQtyNumber,
                     });
                     if (result.type === "error") throw new Error(result.message);
                   }, "Cart line updated")
@@ -419,6 +519,9 @@ function Extension() {
                 Remove 1 quantity
               </s-button>
             </s-stack>
+            {lineQtyValidationError && (
+              <s-banner tone="warning">{lineQtyValidationError}</s-banner>
+            )}
           </s-stack>
         </s-details>
 
