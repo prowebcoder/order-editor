@@ -1,0 +1,11 @@
+name = "pwc-post-purchase"
+type = "checkout_post_purchase"
+uid = "0166cb5e-ab56-7c6e-1528-6a26e740cef1ecc99953"
+
+# [[metafields]]
+# namespace = "my-namespace"
+# key = "my-key"
+
+# [[metafields]]
+# namespace = "my-namespace"
+# key = "my-key-2"
