@@ -26,22 +26,43 @@ function Extension() {
   const [lineQty, setLineQty] = useState("1");
   const [addQty, setAddQty] = useState("1");
   const [modalQty, setModalQty] = useState("1");
-  const [modalSize, setModalSize] = useState("XS");
   const [showOfferStep, setShowOfferStep] = useState(false);
   const [variantImageUrl, setVariantImageUrl] = useState("");
+  const [variantList, setVariantList] = useState([]);
+  const [optionSelections, setOptionSelections] = useState({});
 
   const configuredUpsellVariantId = shopify.settings?.current?.upsell_variant_id ?? "";
   const upsellTitle = shopify.settings?.current?.upsell_title ?? "Featured item";
   const upsellPrice = shopify.settings?.current?.upsell_price ?? "";
   const upsellImage = shopify.settings?.current?.upsell_image_url ?? "";
   const fallbackVariantId = cartLines[0]?.merchandise?.id ?? "";
-  const effectiveUpsellVariantId = configuredUpsellVariantId || fallbackVariantId;
+  const variantFromOptions = variantList.find((variant) =>
+    (variant.selectedOptions ?? []).every(
+      (opt) => !optionSelections[opt.name] || optionSelections[opt.name] === opt.value,
+    ),
+  );
+  const effectiveUpsellVariantId =
+    variantFromOptions?.id ||
+    variantList[0]?.id ||
+    configuredUpsellVariantId ||
+    fallbackVariantId;
   const canAddLines = instructions?.lines?.canAddCartLine === true;
   const addBlockedReason = !effectiveUpsellVariantId
     ? "No variant available. Configure `upsell_variant_id` or ensure cart has at least one line."
     : !canAddLines
       ? "This checkout does not allow cart line additions at this step."
       : "";
+  const optionMap = variantList.reduce((acc, variant) => {
+    for (const option of variant.selectedOptions ?? []) {
+      if (!acc[option.name]) acc[option.name] = new Set();
+      acc[option.name].add(option.value);
+    }
+    return acc;
+  }, {});
+  const optionGroups = Object.entries(optionMap).map(([name, valuesSet]) => ({
+    name,
+    values: Array.from(valuesSet),
+  }));
   const normalizedCountryCode = countryCode.trim().toUpperCase();
   const shippingValidationError =
     normalizedCountryCode && !/^[A-Z]{2}$/.test(normalizedCountryCode)
@@ -76,8 +97,9 @@ function Extension() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadVariantImage() {
-      if (!effectiveUpsellVariantId) {
+    async function loadProductData() {
+      if (!configuredUpsellVariantId) {
+        setVariantList([]);
         setVariantImageUrl("");
         return;
       }
@@ -85,7 +107,7 @@ function Extension() {
       try {
         const response = await shopify.query(
           `#graphql
-            query VariantImage($id: ID!) {
+            query ProductVariants($id: ID!) {
               node(id: $id) {
                 ... on ProductVariant {
                   image {
@@ -95,28 +117,55 @@ function Extension() {
                     featuredImage {
                       url
                     }
+                    variants(first: 50) {
+                      nodes {
+                        id
+                        title
+                        selectedOptions {
+                          name
+                          value
+                        }
+                        image {
+                          url
+                        }
+                        price
+                      }
+                    }
                   }
                 }
               }
             }`,
-          {variables: {id: effectiveUpsellVariantId}},
+          {variables: {id: configuredUpsellVariantId}},
         );
         const data = /** @type {any} */ (response?.data);
+        const variants = data?.node?.product?.variants?.nodes ?? [];
         const image =
           data?.node?.image?.url ??
+          variants?.[0]?.image?.url ??
           data?.node?.product?.featuredImage?.url ??
           "";
-        if (!cancelled) setVariantImageUrl(image);
+        const defaultSelections = {};
+        for (const option of variants?.[0]?.selectedOptions ?? []) {
+          defaultSelections[option.name] = option.value;
+        }
+        if (!cancelled) {
+          setVariantList(variants);
+          setOptionSelections(defaultSelections);
+          setVariantImageUrl(image);
+        }
       } catch {
-        if (!cancelled) setVariantImageUrl("");
+        if (!cancelled) {
+          setVariantList([]);
+          setVariantImageUrl("");
+        }
       }
     }
 
-    loadVariantImage();
+    loadProductData();
     return () => {
       cancelled = true;
     };
-  }, [effectiveUpsellVariantId]);
+  }, [configuredUpsellVariantId]);
 
   async function runAction(fn, okMessage, errorPrefix = "Action failed") {
     setLoading(true);
@@ -295,7 +344,7 @@ function Extension() {
         <s-details summary="Add a product to your order">
           <s-stack gap="small">
             <s-text tone="neutral">
-              Configure `upsell_variant_id` in settings, or this uses the first cart line variant.
+              Configure `upsell_variant_id` in settings, then select options below.
             </s-text>
             <s-text tone="neutral">
               Effective variant: {effectiveUpsellVariantId || "none"}
@@ -390,24 +439,32 @@ function Extension() {
                 <s-stack gap="none">
                   <s-text>{upsellTitle}</s-text>
                   {upsellPrice ? <s-text tone="neutral">{upsellPrice}</s-text> : null}
+                  {variantFromOptions?.title ? <s-text tone="neutral">{variantFromOptions.title}</s-text> : null}
                 </s-stack>
               </s-stack>
             </s-box>
 
-            <s-stack gap="small">
-              <s-text>Size: {modalSize}</s-text>
-              <s-stack direction="inline" gap="small">
-                {["XXS", "XS", "S", "M", "L", "XL"].map((size) => (
-                  <s-button
-                    key={size}
-                    variant={modalSize === size ? "primary" : "secondary"}
-                    onClick={() => setModalSize(size)}
-                  >
-                    {size}
-                  </s-button>
-                ))}
+            {optionGroups.map((group) => (
+              <s-stack key={group.name} gap="small">
+                <s-text>{group.name}: {optionSelections[group.name] || "-"}</s-text>
+                <s-stack direction="inline" gap="small">
+                  {group.values.map((value) => (
+                    <s-button
+                      key={`${group.name}-${value}`}
+                      variant={optionSelections[group.name] === value ? "primary" : "secondary"}
+                      onClick={() =>
+                        setOptionSelections((prev) => ({
+                          ...prev,
+                          [group.name]: value,
+                        }))
+                      }
+                    >
+                      {value}
+                    </s-button>
+                  ))}
+                </s-stack>
               </s-stack>
-            </s-stack>
+            ))}
 
             <s-number-field
               label="Quantity"
@@ -430,7 +487,10 @@ function Extension() {
                     type: "addCartLine",
                     merchandiseId: effectiveUpsellVariantId,
                     quantity: modalQtyNumber,
-                    attributes: [{key: "selected_size", value: modalSize}],
+                    attributes: Object.entries(optionSelections).map(([key, value]) => ({
+                      key: `selected_${key.toLowerCase()}`,
+                      value: String(value),
+                    })),
                   });
                   if (result.type === "error") throw new Error(result.message);
                   setShowOfferStep(false);

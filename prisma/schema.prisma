@@ -33,3 +33,50 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model AppSettings {
+  id                   String   @id @default(cuid())
+  shop                 String   @unique
+  editWindowMinutes    Int      @default(30)
+  allowAddressEdit     Boolean  @default(true)
+  allowProductEdit     Boolean  @default(true)
+  enableUpsells        Boolean  @default(true)
+  codVerification      Boolean  @default(false)
+  allowDiscountCodes   Boolean  @default(true)
+  upsellProductIds     String   @default("[]")
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+}
+
+model EditSession {
+  id              String   @id @default(cuid())
+  shop            String
+  orderId         String
+  token           String   @unique
+  customerEmail   String?
+  expiresAt       DateTime
+  status          String   @default("ACTIVE")
+  paymentStatus   String   @default("PENDING")
+  otpRequired     Boolean  @default(false)
+  otpVerified     Boolean  @default(false)
+  usedAt          DateTime?
+  metadata        String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([shop, orderId])
+  @@index([token, status])
+}
+
+model OrderEditLog {
+  id          String   @id @default(cuid())
+  shop        String
+  orderId     String
+  editSessionId String?
+  changes     String
+  priceDelta  Float    @default(0)
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+
+  @@index([shop, orderId, createdAt])
+}

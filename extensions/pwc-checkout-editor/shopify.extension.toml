@@ -19,6 +19,10 @@ uid = "0f5ab122-ebe7-20ea-6d07-53b1505ef94b153899f8"
 module = "./src/Checkout.jsx"
 target = "purchase.checkout.block.render"
 
+[[extensions.targeting]]
+module = "./src/OrderStatus.jsx"
+target = "purchase.thank-you.block.render"
+
 [extensions.capabilities]
 # Gives your extension access to directly query Shopify’s storefront API.
 # https://shopify.dev/docs/api/checkout-ui-extensions/latest/configuration#api-access
@@ -42,7 +46,7 @@ key = "requestedFreeGift"
 key = "upsell_variant_id"
 type = "variant_reference"
 name = "Upsell variant"
-description = "Variant to add from checkout editor"
+description = "Pick any variant from the target product"
 
 [[extensions.settings.fields]]
 key = "upsell_title"
@@ -61,3 +65,9 @@ key = "upsell_image_url"
 type = "single_line_text_field"
 name = "Upsell image URL"
 description = "Public image URL shown on the card and popup"
+
+[[extensions.settings.fields]]
+key = "portal_base_url"
+type = "single_line_text_field"
+name = "Order edit portal base URL"
+description = "Example: https://order-editor.vercel.app/order-edit"
