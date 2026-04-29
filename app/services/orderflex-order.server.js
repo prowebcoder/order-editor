@@ -19,6 +19,8 @@ export async function getOrderForPortal(admin, orderGid) {
         order(id: $id) {
           id
           name
+          note
+          statusPageUrl
           createdAt
           displayFulfillmentStatus
           displayFinancialStatus
@@ -81,6 +83,18 @@ export async function getOrderForPortal(admin, orderGid) {
 }
 
 export async function createEditSession({shop, orderId, customerEmail, settings}) {
+  const existing = await db.editSession.findFirst({
+    where: {
+      shop,
+      orderId,
+      status: "ACTIVE",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+  if (existing) return existing;
+
   const token = generateEditToken();
   const expiresAt = nowPlusMinutes(settings.editWindowMinutes ?? 30);
   return db.editSession.create({
@@ -94,6 +108,49 @@ export async function createEditSession({shop, orderId, customerEmail, settings}
       metadata: JSON.stringify({}),
     },
   });
+}
+
+export async function createEditSessionFromOrderTime({
+  shop,
+  orderId,
+  customerEmail,
+  settings,
+  orderCreatedAt,
+}) {
+  const existing = await db.editSession.findFirst({
+    where: {
+      shop,
+      orderId,
+      status: "ACTIVE",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+  if (existing) return existing;
+
+  const createdAt = orderCreatedAt ? new Date(orderCreatedAt) : new Date();
+  const expiresAt = new Date(createdAt.getTime() + Number(settings.editWindowMinutes ?? 30) * 60 * 1000);
+  const token = generateEditToken();
+
+  return db.editSession.create({
+    data: {
+      shop,
+      orderId,
+      token,
+      customerEmail: customerEmail || null,
+      expiresAt,
+      otpRequired: Boolean(settings.codVerification),
+      metadata: JSON.stringify({}),
+    },
+  });
+}
+
+function throwOnUserErrors(payload, key) {
+  const errors = payload?.[key]?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e) => e.message).join(", "));
+  }
 }
 
 export async function getValidEditSession(token) {
@@ -145,9 +202,70 @@ export async function executeOrderEdit({admin, orderId, operations}) {
     throw new Error(beginErrors.map((e) => e.message).join(", ") || "Unable to begin order edit");
   }
 
+  const calculatedLinesData = await adminGraphql(
+    admin,
+    `#graphql
+      query CalculatedLines($id: ID!) {
+        node(id: $id) {
+          ... on CalculatedOrder {
+            lineItems(first: 250) {
+              nodes {
+                id
+                quantity
+                variant {
+                  id
+                }
+              }
+            }
+          }
+        }
+      }`,
+    {id: calcId},
+  );
+  const calculatedLines = (calculatedLinesData?.node?.lineItems?.nodes || []).map((line) => ({
+    id: line.id,
+    quantity: Number(line.quantity || 0),
+    variantId: line?.variant?.id || "",
+  }));
+  const consumedCalculatedIds = new Set();
+
+  function resolveCalculatedLineId(op) {
+    const exact = calculatedLines.find(
+      (line) =>
+        !consumedCalculatedIds.has(line.id) &&
+        line.variantId &&
+        op.variantId &&
+        line.variantId === op.variantId &&
+        typeof op.originalQuantity === "number" &&
+        line.quantity === Number(op.originalQuantity),
+    );
+    if (exact) {
+      consumedCalculatedIds.add(exact.id);
+      return exact.id;
+    }
+
+    const byVariant = calculatedLines.find(
+      (line) =>
+        !consumedCalculatedIds.has(line.id) &&
+        line.variantId &&
+        op.variantId &&
+        line.variantId === op.variantId,
+    );
+    if (byVariant) {
+      consumedCalculatedIds.add(byVariant.id);
+      return byVariant.id;
+    }
+
+    return null;
+  }
+
   for (const op of operations) {
     if (op.type === "setQuantity") {
-      await adminGraphql(
+      const calculatedLineItemId = resolveCalculatedLineId(op);
+      if (!calculatedLineItemId) {
+        throw new Error(`Unable to find editable calculated line for ${op.lineItemId}`);
+      }
+      const setQtyResult = await adminGraphql(
         admin,
         `#graphql
           mutation SetQty($id: ID!, $lineItemId: ID!, $quantity: Int!) {
@@ -155,8 +273,9 @@ export async function executeOrderEdit({admin, orderId, operations}) {
               userErrors { field message }
             }
           }`,
-        {id: calcId, lineItemId: op.lineItemId, quantity: Number(op.quantity)},
+        {id: calcId, lineItemId: calculatedLineItemId, quantity: Number(op.quantity)},
       );
+      throwOnUserErrors(setQtyResult, "orderEditSetQuantity");
     } else if (op.type === "addVariant") {
       const variantCheck = await adminGraphql(
         admin,
@@ -180,7 +299,7 @@ export async function executeOrderEdit({admin, orderId, operations}) {
       ) {
         throw new Error("Insufficient inventory for selected variant");
       }
-      await adminGraphql(
+      const addVariantResult = await adminGraphql(
         admin,
         `#graphql
           mutation AddVariant($id: ID!, $variantId: ID!, $quantity: Int!) {
@@ -190,8 +309,13 @@ export async function executeOrderEdit({admin, orderId, operations}) {
           }`,
         {id: calcId, variantId: op.variantId, quantity: Number(op.quantity)},
       );
+      throwOnUserErrors(addVariantResult, "orderEditAddVariant");
     } else if (op.type === "removeLineItem") {
-      await adminGraphql(
+      const calculatedLineItemId = resolveCalculatedLineId(op);
+      if (!calculatedLineItemId) {
+        throw new Error(`Unable to find removable calculated line for ${op.lineItemId}`);
+      }
+      const removeResult = await adminGraphql(
         admin,
         `#graphql
           mutation SetQtyZero($id: ID!, $lineItemId: ID!) {
@@ -199,8 +323,9 @@ export async function executeOrderEdit({admin, orderId, operations}) {
               userErrors { field message }
             }
           }`,
-        {id: calcId, lineItemId: op.lineItemId},
+        {id: calcId, lineItemId: calculatedLineItemId},
       );
+      throwOnUserErrors(removeResult, "orderEditSetQuantity");
     }
   }
 
@@ -225,6 +350,41 @@ export async function executeOrderEdit({admin, orderId, operations}) {
     throw new Error(commitErrors.map((e) => e.message).join(", "));
   }
   return commit.orderEditCommit?.order;
+}
+
+export async function updateOrderDetails({admin, orderId, updates}) {
+  const input = {
+    id: orderId,
+  };
+  if (updates.email) input.email = updates.email;
+  if (typeof updates.note === "string") input.note = updates.note;
+  if (updates.shippingAddress) input.shippingAddress = updates.shippingAddress;
+
+  const result = await adminGraphql(
+    admin,
+    `#graphql
+      mutation UpdateOrder($input: OrderInput!) {
+        orderUpdate(input: $input) {
+          order {
+            id
+            email
+            note
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }`,
+    {input},
+  );
+
+  const errors = result.orderUpdate?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e) => e.message).join(", "));
+  }
+
+  return result.orderUpdate?.order;
 }
 
 export async function logOrderEdit({shop, orderId, editSessionId, changes, priceDelta, status}) {

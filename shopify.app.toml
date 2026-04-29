@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "467a35771c52d0c84cbe8c225fbb9da8"
-name = "pwc-order-editor"
+name = "PWC : Order Editor"
 application_url = "https://order-editor.vercel.app"
 embedded = true
 
@@ -21,7 +21,7 @@ api_version = "2026-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,read_orders,write_orders,read_customers"
+scopes = "write_products,read_orders,write_orders,read_customers,write_order_edits"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 

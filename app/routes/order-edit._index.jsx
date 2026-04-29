@@ -1,7 +1,7 @@
 import {redirect} from "react-router";
 import {unauthenticated} from "../shopify.server";
 import {getSettings} from "../services/orderflex-settings.server";
-import {createEditSession} from "../services/orderflex-order.server";
+import {createEditSessionFromOrderTime} from "../services/orderflex-order.server";
 
 async function adminGraphql(admin, query, variables = {}) {
   const response = await admin.graphql(query, {variables});
@@ -30,6 +30,7 @@ export const loader = async ({request}) => {
       query CustomerEmail($id: ID!) {
         order(id: $id) {
           id
+          createdAt
           customer {
             defaultEmailAddress {
               emailAddress
@@ -41,11 +42,12 @@ export const loader = async ({request}) => {
     ),
   ]);
 
-  const session = await createEditSession({
+  const session = await createEditSessionFromOrderTime({
     shop,
     orderId,
     customerEmail: orderData.order?.customer?.defaultEmailAddress?.emailAddress || null,
     settings,
+    orderCreatedAt: orderData.order?.createdAt,
   });
 
   return redirect(`/order-edit/${session.token}?shop=${encodeURIComponent(shop)}`);
