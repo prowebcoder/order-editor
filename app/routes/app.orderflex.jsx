@@ -1,3 +1,4 @@
+import {useState} from "react";
 import {Form, useActionData, useLoaderData} from "react-router";
 import process from "node:process";
 import {authenticate} from "../shopify.server";
@@ -15,7 +16,7 @@ async function adminGraphql(admin, query, variables = {}) {
 
 export const loader = async ({request}) => {
   const {admin, session} = await authenticate.admin(request);
-  const [settings, orders, products] = await Promise.all([
+  const [settings, orders, products, collections] = await Promise.all([
     getSettings(session.shop),
     adminGraphql(
       admin,
@@ -48,6 +49,18 @@ export const loader = async ({request}) => {
         }
       }`,
     ),
+    adminGraphql(
+      admin,
+      `#graphql
+      query CollectionList {
+        collections(first: 20, sortKey: UPDATED_AT, reverse: true) {
+          nodes {
+            id
+            title
+          }
+        }
+      }`,
+    ),
   ]);
 
   return {
@@ -55,6 +68,7 @@ export const loader = async ({request}) => {
     settings,
     orders: orders.orders.nodes,
     products: products.products.nodes,
+    collections: collections.collections.nodes,
     appUrl: process.env.SHOPIFY_APP_URL || "",
   };
 };
@@ -69,6 +83,10 @@ export const action = async ({request}) => {
       .split(",")
       .map((id) => id.trim())
       .filter(Boolean);
+    const upsellCollectionIds = String(form.get("upsellCollectionIds") || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
     const settings = await updateSettings(session.shop, {
       editWindowMinutes: Number(form.get("editWindowMinutes") || 30),
       allowAddressEdit: form.get("allowAddressEdit") === "on",
@@ -77,6 +95,7 @@ export const action = async ({request}) => {
       codVerification: form.get("codVerification") === "on",
       allowDiscountCodes: form.get("allowDiscountCodes") === "on",
       upsellProductIds,
+      upsellCollectionIds,
     });
     return {ok: true, message: "Settings saved", settings};
   }
@@ -106,8 +125,74 @@ export const action = async ({request}) => {
 };
 
 export default function OrderFlexAdmin() {
-  const {settings, orders, products} = useLoaderData();
+  const {settings, orders, products, collections} = useLoaderData();
   const actionData = useActionData();
+  const [selectedProducts, setSelectedProducts] = useState(
+    (settings.upsellProductIds || []).map((id) => {
+      const existing = products.find((p) => p.id === id);
+      return {id, title: existing?.title || id};
+    }),
+  );
+  const [selectedCollections, setSelectedCollections] = useState(
+    (settings.upsellCollectionIds || []).map((id) => {
+      const existing = collections.find((c) => c.id === id);
+      return {id, title: existing?.title || id};
+    }),
+  );
+  const [pickerError, setPickerError] = useState("");
+
+  async function pickProducts() {
+    setPickerError("");
+    try {
+      const picker = globalThis?.shopify?.resourcePicker;
+      if (typeof picker !== "function") {
+        setPickerError("Resource picker is unavailable in this surface.");
+        return;
+      }
+      const result = await picker({
+        type: "product",
+        action: "select",
+        multiple: true,
+        filter: {variants: false},
+        selectionIds: selectedProducts.map((p) => ({id: p.id})),
+      });
+      if (!result) return;
+      setSelectedProducts(
+        result.map((item) => ({
+          id: item.id,
+          title: item.title || item.id,
+        })),
+      );
+    } catch (error) {
+      setPickerError(String(error));
+    }
+  }
+
+  async function pickCollections() {
+    setPickerError("");
+    try {
+      const picker = globalThis?.shopify?.resourcePicker;
+      if (typeof picker !== "function") {
+        setPickerError("Resource picker is unavailable in this surface.");
+        return;
+      }
+      const result = await picker({
+        type: "collection",
+        action: "select",
+        multiple: true,
+        selectionIds: selectedCollections.map((c) => ({id: c.id})),
+      });
+      if (!result) return;
+      setSelectedCollections(
+        result.map((item) => ({
+          id: item.id,
+          title: item.title || item.id,
+        })),
+      );
+    } catch (error) {
+      setPickerError(String(error));
+    }
+  }
 
   return (
     <s-page heading="OrderFlex">
@@ -142,11 +227,43 @@ export default function OrderFlexAdmin() {
               <input type="checkbox" name="codVerification" defaultChecked={settings.codVerification} />
               <span> Enable COD OTP verification</span>
             </label>
-            <s-text-field
-              label="Upsell product IDs (comma separated)"
+            <input
+              type="hidden"
               name="upsellProductIds"
-              defaultValue={settings.upsellProductIds.join(", ")}
+              value={selectedProducts.map((item) => item.id).join(",")}
             />
+            <input
+              type="hidden"
+              name="upsellCollectionIds"
+              value={selectedCollections.map((item) => item.id).join(",")}
+            />
+            <s-stack gap="small">
+              <s-text>Upsell products</s-text>
+              <s-button type="button" variant="secondary" onClick={pickProducts}>
+                Select products
+              </s-button>
+              {selectedProducts.length ? (
+                <s-text type="small">
+                  {selectedProducts.map((item) => item.title).join(", ")}
+                </s-text>
+              ) : (
+                <s-text type="small">No products selected.</s-text>
+              )}
+            </s-stack>
+            <s-stack gap="small">
+              <s-text>Upsell collections</s-text>
+              <s-button type="button" variant="secondary" onClick={pickCollections}>
+                Select collections
+              </s-button>
+              {selectedCollections.length ? (
+                <s-text type="small">
+                  {selectedCollections.map((item) => item.title).join(", ")}
+                </s-text>
+              ) : (
+                <s-text type="small">No collections selected.</s-text>
+              )}
+            </s-stack>
+            {pickerError ? <s-banner tone="critical">{pickerError}</s-banner> : null}
             <s-button type="submit">Save settings</s-button>
           </s-stack>
         </Form>
@@ -174,6 +291,15 @@ export default function OrderFlexAdmin() {
       </s-section>
 
       <s-section heading="Catalog reference">
+        <s-heading>Collections</s-heading>
+        <s-unordered-list>
+          {collections.map((c) => (
+            <s-list-item key={c.id}>
+              {c.title} ({c.id})
+            </s-list-item>
+          ))}
+        </s-unordered-list>
+        <s-heading>Products</s-heading>
         <s-unordered-list>
           {products.map((p) => (
             <s-list-item key={p.id}>

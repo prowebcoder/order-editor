@@ -44,6 +44,7 @@ model AppSettings {
   codVerification      Boolean  @default(false)
   allowDiscountCodes   Boolean  @default(true)
   upsellProductIds     String   @default("[]")
+  upsellCollectionIds  String   @default("[]")
   updatedAt            DateTime @updatedAt
   createdAt            DateTime @default(now())
 }

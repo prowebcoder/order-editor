@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS = {
   codVerification: false,
   allowDiscountCodes: true,
   upsellProductIds: [],
+  upsellCollectionIds: [],
 };
 
 export async function getSettings(shop) {
@@ -23,11 +24,13 @@ export async function getSettings(shop) {
         codVerification: DEFAULT_SETTINGS.codVerification,
         allowDiscountCodes: DEFAULT_SETTINGS.allowDiscountCodes,
         upsellProductIds: JSON.stringify(DEFAULT_SETTINGS.upsellProductIds),
+        upsellCollectionIds: JSON.stringify(DEFAULT_SETTINGS.upsellCollectionIds),
       },
     });
-    return normalizeSettings(created);
+    return normalizeSettings(created, DEFAULT_SETTINGS.upsellCollectionIds);
   }
-  return normalizeSettings(existing);
+  const collectionIds = await readCollectionIds(shop);
+  return normalizeSettings(existing, collectionIds);
 }
 
 export async function updateSettings(shop, payload) {
@@ -39,6 +42,9 @@ export async function updateSettings(shop, payload) {
     upsellProductIds: Array.isArray(payload.upsellProductIds)
       ? payload.upsellProductIds
       : current.upsellProductIds,
+    upsellCollectionIds: Array.isArray(payload.upsellCollectionIds)
+      ? payload.upsellCollectionIds
+      : current.upsellCollectionIds,
   };
 
   const updated = await db.appSettings.upsert({
@@ -64,13 +70,21 @@ export async function updateSettings(shop, payload) {
     },
   });
 
-  return normalizeSettings(updated);
+  await db.$executeRaw`
+    UPDATE "AppSettings"
+    SET "upsellCollectionIds" = ${JSON.stringify(merged.upsellCollectionIds)}
+    WHERE "shop" = ${shop}
+  `;
+
+  const collectionIds = await readCollectionIds(shop);
+  return normalizeSettings(updated, collectionIds);
 }
 
-function normalizeSettings(settings) {
+function normalizeSettings(settings, collectionIds = []) {
   return {
     ...settings,
     upsellProductIds: safeJsonArray(settings.upsellProductIds),
+    upsellCollectionIds: Array.isArray(collectionIds) ? collectionIds : [],
   };
 }
 
@@ -81,4 +95,15 @@ function safeJsonArray(value) {
   } catch {
     return [];
   }
+}
+
+async function readCollectionIds(shop) {
+  const rows = await db.$queryRaw`
+    SELECT "upsellCollectionIds"
+    FROM "AppSettings"
+    WHERE "shop" = ${shop}
+    LIMIT 1
+  `;
+  const value = rows?.[0]?.upsellCollectionIds ?? "[]";
+  return safeJsonArray(value);
 }
