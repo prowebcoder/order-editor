@@ -437,8 +437,8 @@ export function InlineOrderEditor() {
               </s-box>
             ) : null}
 
-            <s-box border="base" borderRadius="base" padding="base">
-              <s-details>
+            <s-box border="base" borderRadius="base" padding="base" minInlineSize="100%">
+              <s-details >
                 <s-summary>Edit gift note</s-summary>
               <s-stack gap="small">
                 <s-text-area
