@@ -92,10 +92,10 @@ export const action = async ({request}) => {
       allowAddressEdit: form.get("allowAddressEdit") === "on",
       allowProductEdit: form.get("allowProductEdit") === "on",
       enableUpsells: form.get("enableUpsells") === "on",
-      codVerification: form.get("codVerification") === "on",
       allowDiscountCodes: form.get("allowDiscountCodes") === "on",
       upsellProductIds,
       upsellCollectionIds,
+      checkoutOfferHeading: String(form.get("checkoutOfferHeading") || "Add the finishing touch"),
     });
     return {ok: true, message: "Settings saved", settings};
   }
@@ -223,10 +223,6 @@ export default function OrderFlexAdmin() {
               <input type="checkbox" name="allowDiscountCodes" defaultChecked={settings.allowDiscountCodes} />
               <span> Enable discount codes</span>
             </label>
-            <label>
-              <input type="checkbox" name="codVerification" defaultChecked={settings.codVerification} />
-              <span> Enable COD OTP verification</span>
-            </label>
             <input
               type="hidden"
               name="upsellProductIds"
@@ -237,6 +233,13 @@ export default function OrderFlexAdmin() {
               name="upsellCollectionIds"
               value={selectedCollections.map((item) => item.id).join(",")}
             />
+            <s-stack gap="small">
+              <s-text-field
+                label="Checkout offer heading"
+                name="checkoutOfferHeading"
+                defaultValue={settings.checkoutOfferHeading || "Add the finishing touch"}
+              />
+            </s-stack>
             <s-stack gap="small">
               <s-text>Upsell products</s-text>
               <s-button type="button" variant="secondary" onClick={pickProducts}>

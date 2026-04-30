@@ -5,10 +5,10 @@ const DEFAULT_SETTINGS = {
   allowAddressEdit: true,
   allowProductEdit: true,
   enableUpsells: true,
-  codVerification: false,
   allowDiscountCodes: true,
   upsellProductIds: [],
   upsellCollectionIds: [],
+  checkoutOfferHeading: "Add the finishing touch",
 };
 
 export async function getSettings(shop) {
@@ -21,16 +21,20 @@ export async function getSettings(shop) {
         allowAddressEdit: DEFAULT_SETTINGS.allowAddressEdit,
         allowProductEdit: DEFAULT_SETTINGS.allowProductEdit,
         enableUpsells: DEFAULT_SETTINGS.enableUpsells,
-        codVerification: DEFAULT_SETTINGS.codVerification,
         allowDiscountCodes: DEFAULT_SETTINGS.allowDiscountCodes,
         upsellProductIds: JSON.stringify(DEFAULT_SETTINGS.upsellProductIds),
         upsellCollectionIds: JSON.stringify(DEFAULT_SETTINGS.upsellCollectionIds),
       },
     });
-    return normalizeSettings(created, DEFAULT_SETTINGS.upsellCollectionIds);
+    return normalizeSettings(
+      created,
+      DEFAULT_SETTINGS.upsellCollectionIds,
+      DEFAULT_SETTINGS.checkoutOfferHeading,
+    );
   }
   const collectionIds = await readCollectionIds(shop);
-  return normalizeSettings(existing, collectionIds);
+  const checkoutOfferHeading = await readCheckoutOfferHeading(shop);
+  return normalizeSettings(existing, collectionIds, checkoutOfferHeading);
 }
 
 export async function updateSettings(shop, payload) {
@@ -45,6 +49,9 @@ export async function updateSettings(shop, payload) {
     upsellCollectionIds: Array.isArray(payload.upsellCollectionIds)
       ? payload.upsellCollectionIds
       : current.upsellCollectionIds,
+    checkoutOfferHeading: String(
+      payload.checkoutOfferHeading ?? current.checkoutOfferHeading ?? DEFAULT_SETTINGS.checkoutOfferHeading,
+    ).trim() || DEFAULT_SETTINGS.checkoutOfferHeading,
   };
 
   const updated = await db.appSettings.upsert({
@@ -55,7 +62,6 @@ export async function updateSettings(shop, payload) {
       allowAddressEdit: Boolean(merged.allowAddressEdit),
       allowProductEdit: Boolean(merged.allowProductEdit),
       enableUpsells: Boolean(merged.enableUpsells),
-      codVerification: Boolean(merged.codVerification),
       allowDiscountCodes: Boolean(merged.allowDiscountCodes),
       upsellProductIds: JSON.stringify(merged.upsellProductIds),
     },
@@ -64,27 +70,39 @@ export async function updateSettings(shop, payload) {
       allowAddressEdit: Boolean(merged.allowAddressEdit),
       allowProductEdit: Boolean(merged.allowProductEdit),
       enableUpsells: Boolean(merged.enableUpsells),
-      codVerification: Boolean(merged.codVerification),
       allowDiscountCodes: Boolean(merged.allowDiscountCodes),
       upsellProductIds: JSON.stringify(merged.upsellProductIds),
     },
   });
 
-  await db.$executeRaw`
-    UPDATE "AppSettings"
-    SET "upsellCollectionIds" = ${JSON.stringify(merged.upsellCollectionIds)}
-    WHERE "shop" = ${shop}
-  `;
+  try {
+    await db.$executeRaw`
+      UPDATE "AppSettings"
+      SET "upsellCollectionIds" = ${JSON.stringify(merged.upsellCollectionIds)},
+          "checkoutOfferHeading" = ${merged.checkoutOfferHeading}
+      WHERE "shop" = ${shop}
+    `;
+  } catch (error) {
+    if (!isMissingColumnError(error)) throw error;
+    // Migration not applied yet: keep app usable with defaults.
+    await db.$executeRaw`
+      UPDATE "AppSettings"
+      SET "upsellCollectionIds" = ${JSON.stringify(merged.upsellCollectionIds)}
+      WHERE "shop" = ${shop}
+    `;
+  }
 
   const collectionIds = await readCollectionIds(shop);
-  return normalizeSettings(updated, collectionIds);
+  const checkoutOfferHeading = await readCheckoutOfferHeading(shop);
+  return normalizeSettings(updated, collectionIds, checkoutOfferHeading);
 }
 
-function normalizeSettings(settings, collectionIds = []) {
+function normalizeSettings(settings, collectionIds = [], checkoutOfferHeading = DEFAULT_SETTINGS.checkoutOfferHeading) {
   return {
     ...settings,
     upsellProductIds: safeJsonArray(settings.upsellProductIds),
     upsellCollectionIds: Array.isArray(collectionIds) ? collectionIds : [],
+    checkoutOfferHeading: String(checkoutOfferHeading || DEFAULT_SETTINGS.checkoutOfferHeading),
   };
 }
 
@@ -106,4 +124,24 @@ async function readCollectionIds(shop) {
   `;
   const value = rows?.[0]?.upsellCollectionIds ?? "[]";
   return safeJsonArray(value);
+}
+
+async function readCheckoutOfferHeading(shop) {
+  try {
+    const rows = await db.$queryRaw`
+      SELECT "checkoutOfferHeading"
+      FROM "AppSettings"
+      WHERE "shop" = ${shop}
+      LIMIT 1
+    `;
+    return String(rows?.[0]?.checkoutOfferHeading || DEFAULT_SETTINGS.checkoutOfferHeading);
+  } catch (error) {
+    if (!isMissingColumnError(error)) throw error;
+    return DEFAULT_SETTINGS.checkoutOfferHeading;
+  }
+}
+
+function isMissingColumnError(error) {
+  const message = String(error?.message || "");
+  return message.includes("42703") || /column .* does not exist/i.test(message);
 }

@@ -22,7 +22,7 @@ export function InlineOrderEditor() {
     lines: [],
     upsellProducts: [],
   });
-  const [draft, setDraft] = useState({lineChanges: [], addVariantId: "", addQty: 1, otp: ""});
+  const [draft, setDraft] = useState({lineChanges: [], addVariantId: "", addQty: 1});
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -104,7 +104,6 @@ export function InlineOrderEditor() {
           })),
           addVariantId: "",
           addQty: 1,
-          otp: "",
         });
       } catch (error) {
         g.clearTimeout(failTimer);
@@ -597,23 +596,6 @@ export function InlineOrderEditor() {
                     </s-button>
                   </>
                 )}
-              </s-stack>
-                </s-details>
-              </s-box>
-            ) : null}
-
-            {state.session?.otpRequired && !state.session?.otpVerified ? (
-              <s-box border="base" borderRadius="base" padding="base">
-                <s-details>
-                  <s-summary>OTP verification (COD)</s-summary>
-              <s-stack gap="small">
-                <s-button onClick={() => mutate("send-otp")}>Send OTP</s-button>
-                <s-text-field
-                  label="OTP"
-                  value={draft.otp}
-                  onChange={(event) => setDraft((prev) => ({...prev, otp: event.currentTarget.value}))}
-                />
-                <s-button onClick={() => mutate("verify-otp", {otp: draft.otp})}>Verify OTP</s-button>
               </s-stack>
                 </s-details>
               </s-box>

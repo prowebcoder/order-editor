@@ -8,7 +8,8 @@ export default async () => {
 
 function Extension() {
   const instructions = shopify.instructions.value;
-  const cartLines = shopify.cartLines?.value ?? [];
+  const cartLineSignal = shopify.lines?.value ?? shopify.lines?.current ?? shopify.lines ?? shopify.cartLines?.value ?? [];
+  const cartLines = Array.isArray(cartLineSignal) ? cartLineSignal : [];
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [offersLoading, setOffersLoading] = useState(false);
@@ -16,6 +17,7 @@ function Extension() {
   const [visibleOfferCount, setVisibleOfferCount] = useState(2);
   const [offersEnabled, setOffersEnabled] = useState(true);
   const [offersError, setOffersError] = useState("");
+  const [offerHeading, setOfferHeading] = useState("Add the finishing touch");
   const [shopDomain, setShopDomain] = useState("");
   const [modalProduct, setModalProduct] = useState(null);
   const [modalQty, setModalQty] = useState("1");
@@ -54,6 +56,7 @@ function Extension() {
         }
         if (!cancelled) {
           setOffersEnabled(Boolean(data.settings?.enableUpsells) && Boolean(data.settings?.allowProductEdit));
+          setOfferHeading(String(data.settings?.checkoutOfferHeading || "Add the finishing touch"));
           setOffers(Array.isArray(data.products) ? data.products : []);
           setVisibleOfferCount(2);
         }
@@ -95,9 +98,8 @@ function Extension() {
   const cartVariantIds = new Set(
     cartLines.map((line) => String(line?.merchandise?.id || "")).filter(Boolean),
   );
-  const visibleOffers = offers.filter((p) => p.variants.some((v) => !cartVariantIds.has(String(v.id))));
-  const displayedOffers = visibleOffers.slice(0, visibleOfferCount);
-  const canShowMore = visibleOfferCount < visibleOffers.length;
+  const displayedOffers = offers.slice(0, visibleOfferCount);
+  const canShowMore = visibleOfferCount < offers.length;
 
   async function addVariantToCart(variantId) {
     await runAction(async () => {
@@ -108,6 +110,17 @@ function Extension() {
       });
       if (result.type === "error") throw new Error(result.message);
     }, "Product added");
+  }
+
+  async function removeCartLine(lineId, quantity) {
+    await runAction(async () => {
+      const result = await shopify.applyCartLinesChange({
+        type: "removeCartLine",
+        id: lineId,
+        quantity: Number(quantity || 1),
+      });
+      if (result.type === "error") throw new Error(result.message);
+    }, "Product removed");
   }
 
   function formatPrice(rawPrice) {
@@ -125,26 +138,26 @@ function Extension() {
   }
 
   return (
-    <s-box padding="base" border="base" borderRadius="base">
+   
       <s-stack gap="base">
-        <s-heading>Edit your checkout</s-heading>
+       
 
-        <s-box border="base" borderRadius="base" padding="base">
+       
           <s-stack gap="base">
-            <s-heading>Add the finishing touch</s-heading>
+            <s-heading>{offerHeading}</s-heading>
             {offersLoading ? <s-text tone="neutral">Loading products…</s-text> : null}
             {offersError ? <s-banner tone="warning">{offersError}</s-banner> : null}
             {!offersLoading && !offersError && !offersEnabled ? (
               <s-text tone="neutral">Upsell offers are disabled in OrderFlex settings.</s-text>
             ) : null}
-            {!offersLoading && !offersError && offersEnabled && visibleOffers.length === 0 ? (
+            {!offersLoading && !offersError && offersEnabled && offers.length === 0 ? (
               <s-text tone="neutral">No eligible products available from configured collections/products.</s-text>
             ) : null}
 
             {displayedOffers.length ? (
               <s-grid gap="base" gridTemplateColumns="1fr 1fr">
                 {displayedOffers.map((product) => {
-                  const firstVariant = product.variants.find((v) => !cartVariantIds.has(String(v.id))) || product.variants[0];
+                  const firstVariant = product.variants[0];
                   const hasMultiple = product.variants.length > 1;
                   return (
                     <s-box key={product.id} border="base" borderRadius="base" padding="small">
@@ -208,7 +221,7 @@ function Extension() {
               </s-grid>
             ) : null}
           </s-stack>
-        </s-box>
+       
 
         <s-modal ref={modalRef} id="variant-picker-modal" heading="Select variant" size="base">
           <s-stack gap="base">
@@ -266,8 +279,39 @@ function Extension() {
           </s-button>
         </s-modal>
 
+        {cartLines.length ? (
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-stack gap="base">
+              <s-heading>Remove items</s-heading>
+              {cartLines.length <= 1 ? (
+                <s-banner tone="warning">
+                  At least 1 product must remain in checkout. Add another product before removing this one.
+                </s-banner>
+              ) : null}
+              {cartLines.map((line) => (
+                <s-grid key={line.id} gridTemplateColumns="1fr auto" gap="small" alignItems="center">
+                  <s-text>
+                    {(line?.merchandise?.title || line?.merchandise?.product?.title || "Cart item")} x
+                    {Number(line?.quantity || 1)}
+                  </s-text>
+                  <s-button
+                    variant="secondary"
+                    tone="critical"
+                    disabled={loading || cartLines.length <= 1}
+                    onClick={async () => {
+                      await removeCartLine(line.id, line.quantity || 1);
+                    }}
+                  >
+                    Remove
+                  </s-button>
+                </s-grid>
+              ))}
+            </s-stack>
+          </s-box>
+        ) : null}
+
         {statusMessage && <s-banner tone="info">{statusMessage}</s-banner>}
       </s-stack>
-    </s-box>
+  
   );
 }

@@ -1,0 +1,32 @@
+{% render 'order_edit_button_content' %}
+
+{% schema %}
+{
+  "name": "Order edit button",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["customers/order"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Need to update your order?"
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Edit order"
+    },
+    {
+      "type": "text",
+      "id": "app_base_url",
+      "label": "App base URL",
+      "info": "Example: https://your-app-domain.com",
+      "default": "https://order-editor.vercel.app"
+    }
+  ]
+}
+{% endschema %}

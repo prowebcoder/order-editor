@@ -115,6 +115,7 @@ export const loader = async ({request}) => {
       settings: {
         enableUpsells: Boolean(settings.enableUpsells),
         allowProductEdit: Boolean(settings.allowProductEdit),
+        checkoutOfferHeading: settings.checkoutOfferHeading || "Add the finishing touch",
       },
       products,
     });

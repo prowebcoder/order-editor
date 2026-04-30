@@ -104,7 +104,7 @@ export async function createEditSession({shop, orderId, customerEmail, settings}
       token,
       customerEmail: customerEmail || null,
       expiresAt,
-      otpRequired: Boolean(settings.codVerification),
+      otpRequired: false,
       metadata: JSON.stringify({}),
     },
   });
@@ -140,7 +140,7 @@ export async function createEditSessionFromOrderTime({
       token,
       customerEmail: customerEmail || null,
       expiresAt,
-      otpRequired: Boolean(settings.codVerification),
+      otpRequired: false,
       metadata: JSON.stringify({}),
     },
   });

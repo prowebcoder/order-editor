@@ -9,8 +9,6 @@ import {
   markEditSessionUsed,
   updateOrderDetails,
 } from "../services/orderflex-order.server";
-import db from "../db.server";
-import {generateOtpCode} from "../services/orderflex-token.server";
 
 async function adminGraphql(admin, query, variables = {}) {
   const response = await admin.graphql(query, {variables});
@@ -110,40 +108,6 @@ export const action = async ({request}) => {
     }
     if (order.displayFulfillmentStatus !== "UNFULFILLED") {
       return toJson({ok: false, message: "Order can no longer be edited after fulfillment starts."}, 409);
-    }
-
-    if (intent === "send-otp") {
-      const code = generateOtpCode();
-      const metadata = JSON.parse(session.metadata || "{}");
-      metadata.otpCode = code;
-      metadata.otpGeneratedAt = new Date().toISOString();
-      await db.editSession.update({
-        where: {id: session.id},
-        data: {metadata: JSON.stringify(metadata)},
-      });
-      return toJson({
-        ok: true,
-        message: `OTP generated for demo: ${code}. Integrate SMS/email provider in production.`,
-        ...(await buildExtensionState({admin, shop, token})),
-      });
-    }
-
-    if (intent === "verify-otp") {
-      const otp = String(payload.otp || "");
-      const metadata = JSON.parse(session.metadata || "{}");
-      if (!metadata.otpCode || otp !== metadata.otpCode) {
-        return toJson({ok: false, message: "Invalid OTP"});
-      }
-      await db.editSession.update({where: {id: session.id}, data: {otpVerified: true}});
-      return toJson({
-        ok: true,
-        message: "OTP verified. Editing unlocked.",
-        ...(await buildExtensionState({admin, shop, token})),
-      });
-    }
-
-    if (session.otpRequired && !session.otpVerified) {
-      return toJson({ok: false, message: "OTP verification is required before editing this order."}, 403);
     }
 
     if (intent === "update-contact") {
@@ -295,15 +259,12 @@ async function buildExtensionState({admin, shop, token}) {
     session: {
       id: session.id,
       expiresAt: session.expiresAt,
-      otpRequired: session.otpRequired,
-      otpVerified: session.otpVerified,
       status: session.status,
     },
     settings: {
       allowAddressEdit: settings.allowAddressEdit,
       allowProductEdit: settings.allowProductEdit,
       enableUpsells: settings.enableUpsells,
-      codVerification: settings.codVerification,
     },
     order: {
       id: order.id,

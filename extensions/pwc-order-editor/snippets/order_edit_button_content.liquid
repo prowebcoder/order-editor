@@ -1,0 +1,30 @@
+{%- if customer and order -%}
+  {%- assign app_base = block.settings.app_base_url | strip -%}
+  {%- if app_base == blank -%}
+    <div style="border: 1px solid #f59e0b; border-radius: 8px; padding: 14px; margin: 12px 0; background: #fffbeb;">
+      Set <strong>App base URL</strong> in this block to enable order editing.
+    </div>
+  {%- else -%}
+    {%- assign clean_base = app_base | replace: '/order-edit', '' | replace: '//theme-order-edit-link', '/theme-order-edit-link' -%}
+    {%- assign encoded_return_to = request.path | url_encode -%}
+    {%- assign edit_href = clean_base
+      | append: '/theme-order-edit-link?shop='
+      | append: shop.permanent_domain
+      | append: '&orderId='
+      | append: order.id
+      | append: '&return_to='
+      | append: encoded_return_to
+    -%}
+    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin: 12px 0;">
+      <div style="font-weight: 600; margin-bottom: 8px;">
+        {{ block.settings.heading | escape }}
+      </div>
+      <a
+        href="{{ edit_href }}"
+        style="display:inline-block; text-decoration:none; background:#111827; color:#ffffff; padding:10px 14px; border-radius:6px; font-weight:600;"
+      >
+        {{ block.settings.button_label | escape }}
+      </a>
+    </div>
+  {%- endif -%}
+{%- endif -%}

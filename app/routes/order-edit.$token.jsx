@@ -9,8 +9,6 @@ import {
   buildPriceSummary,
   updateOrderDetails,
 } from "../services/orderflex-order.server";
-import db from "../db.server";
-import {generateOtpCode} from "../services/orderflex-token.server";
 
 function flattenOrderLines(order) {
   return (order?.lineItems?.nodes || []).map((line) => ({
@@ -124,38 +122,6 @@ export const action = async ({params, request}) => {
   }
   if (order.displayFulfillmentStatus !== "UNFULFILLED") {
     return {ok: false, message: "Order can no longer be edited after fulfillment starts."};
-  }
-
-  if (intent === "send-otp") {
-    const code = generateOtpCode();
-    const metadata = JSON.parse(session.metadata || "{}");
-    metadata.otpCode = code;
-    metadata.otpGeneratedAt = new Date().toISOString();
-    await db.editSession.update({
-      where: {id: session.id},
-      data: {metadata: JSON.stringify(metadata)},
-    });
-    return {
-      ok: true,
-      message: `OTP generated for demo: ${code}. Integrate SMS/email provider in production.`,
-    };
-  }
-
-  if (intent === "verify-otp") {
-    const otp = String(form.get("otp") || "");
-    const metadata = JSON.parse(session.metadata || "{}");
-    if (!metadata.otpCode || otp !== metadata.otpCode) {
-      return {ok: false, message: "Invalid OTP"};
-    }
-    await db.editSession.update({
-      where: {id: session.id},
-      data: {otpVerified: true},
-    });
-    return {ok: true, message: "OTP verified. Editing unlocked."};
-  }
-
-  if (session.otpRequired && !session.otpVerified) {
-    return {ok: false, message: "OTP verification is required before editing this order."};
   }
 
   if (intent === "update-contact") {
@@ -646,22 +612,6 @@ export default function CustomerOrderEditPortal() {
         </button>
       </Form>
 
-      {settings.codVerification ? (
-        <section style={{...ui.card, marginTop: 18}}>
-          <h2 style={ui.sectionTitle}>COD verification</h2>
-          <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
-            <Form method="post">
-              <input type="hidden" name="intent" value="send-otp" />
-              <button type="submit" style={ui.secondaryBtn}>Send OTP</button>
-            </Form>
-            <Form method="post" style={{display: "flex", gap: 8}}>
-              <input type="hidden" name="intent" value="verify-otp" />
-              <input name="otp" type="text" placeholder="Enter OTP" style={ui.input} />
-              <button type="submit" style={ui.secondaryBtn}>Verify OTP</button>
-            </Form>
-          </div>
-        </section>
-      ) : null}
     </main>
   );
 }
