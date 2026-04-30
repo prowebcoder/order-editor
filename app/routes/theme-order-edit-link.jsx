@@ -16,10 +16,10 @@ export const loader = async ({request}) => {
   const url = new URL(request.url);
   const shop = String(url.searchParams.get("shop") || "").trim();
   const orderId = normalizeOrderId(url.searchParams.get("orderId"));
-  const returnTo = String(url.searchParams.get("return_to") || "/");
+  const returnTo = safeReturnTo(shop, url.searchParams.get("return_to"));
 
   if (!shop || !orderId) {
-    return redirect(returnTo);
+    return redirect(withError(returnTo, "invalid_link"));
   }
 
   try {
@@ -47,7 +47,7 @@ export const loader = async ({request}) => {
 
     const order = orderData.order;
     if (!order || order.displayFulfillmentStatus !== "UNFULFILLED") {
-      return redirect(returnTo);
+      return redirect(withError(returnTo, "order_not_editable"));
     }
 
     const session = await createEditSessionFromOrderTime({
@@ -60,7 +60,7 @@ export const loader = async ({request}) => {
 
     return redirect(`/order-edit/${session.token}?shop=${encodeURIComponent(shop)}`);
   } catch {
-    return redirect(returnTo);
+    return redirect(withError(returnTo, "link_failed"));
   }
 };
 
@@ -70,4 +70,28 @@ function normalizeOrderId(value) {
   if (input.startsWith("gid://shopify/Order/")) return input;
   if (/^\d+$/.test(input)) return `gid://shopify/Order/${input}`;
   return "";
+}
+
+function safeReturnTo(shop, input) {
+  const fallback = `https://${shop || "example.myshopify.com"}/account`;
+  const raw = String(input || "").trim();
+  if (!raw) return fallback;
+
+  try {
+    const absolute = new URL(raw, fallback);
+    const isSameShop = absolute.hostname === shop;
+    return isSameShop ? absolute.toString() : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function withError(urlString, code) {
+  try {
+    const url = new URL(urlString);
+    url.searchParams.set("order_edit_error", code);
+    return url.toString();
+  } catch {
+    return urlString;
+  }
 }

@@ -1,0 +1,93 @@
+{%- if customer and customer.orders_count > 0 -%}
+  <div id="order-edit-inline-error-account" style="display:none; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; padding:10px 12px; margin:12px 0;"></div>
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var code = params.get("order_edit_error");
+        if (!code) return;
+        var node = document.getElementById("order-edit-inline-error-account");
+        if (!node) return;
+        var messages = {
+          invalid_link: "This edit link is invalid. Please try again from your order page.",
+          order_not_editable: "This order can no longer be edited.",
+          link_failed: "We could not start order editing right now. Please try again."
+        };
+        node.textContent = messages[code] || "Unable to open order editor right now.";
+        node.style.display = "block";
+      } catch (e) {
+        // no-op
+      }
+    })();
+  </script>
+  {%- assign app_base = block.settings.app_base_url | strip -%}
+  <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin: 12px 0;">
+    <div style="font-weight: 600; margin-bottom: 8px;">
+      {{ block.settings.heading | escape }}
+    </div>
+
+    {%- if app_base == blank -%}
+      <div style="border: 1px solid #f59e0b; border-radius: 8px; padding: 10px; background: #fffbeb;">
+        Set <strong>App base URL</strong> in this block to enable order edit links.
+      </div>
+    {%- else -%}
+      {%- assign clean_base = app_base | replace: '/order-edit', '' | replace: '//theme-order-edit-link', '/theme-order-edit-link' -%}
+      {%- assign return_to_absolute = 'https://' | append: shop.permanent_domain | append: request.path -%}
+      {%- assign encoded_return_to = return_to_absolute | url_encode -%}
+      <ul style="margin: 0; padding-left: 18px;">
+        {%- for order in customer.orders limit: block.settings.max_orders -%}
+          {%- assign edit_href = clean_base
+            | append: '/theme-order-edit-link?shop='
+            | append: shop.permanent_domain
+            | append: '&orderId='
+            | append: order.id
+            | append: '&return_to='
+            | append: encoded_return_to
+          -%}
+          <li style="margin: 6px 0;">
+            <a href="{{ edit_href }}" style="text-decoration:none; color:#111827; font-weight:600;">
+              {{ block.settings.link_label | escape }} #{{ order.name | remove: '#' }}
+            </a>
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Account order edit links",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["customers/account"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Edit your recent orders"
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "Link label",
+      "default": "Edit order"
+    },
+    {
+      "type": "number",
+      "id": "max_orders",
+      "label": "Max orders to show",
+      "default": 5
+    },
+    {
+      "type": "text",
+      "id": "app_base_url",
+      "label": "App base URL",
+      "info": "Example: https://your-app-domain.com",
+      "default": "https://order-editor.vercel.app"
+    }
+  ]
+}
+{% endschema %}

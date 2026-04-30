@@ -1,4 +1,25 @@
 {%- if customer and order -%}
+  <div id="order-edit-inline-error" style="display:none; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; padding:10px 12px; margin:12px 0;"></div>
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var code = params.get("order_edit_error");
+        if (!code) return;
+        var node = document.getElementById("order-edit-inline-error");
+        if (!node) return;
+        var messages = {
+          invalid_link: "This edit link is invalid. Please try again from your order page.",
+          order_not_editable: "This order can no longer be edited.",
+          link_failed: "We could not start order editing right now. Please try again."
+        };
+        node.textContent = messages[code] || "Unable to open order editor right now.";
+        node.style.display = "block";
+      } catch (e) {
+        // no-op
+      }
+    })();
+  </script>
   {%- assign app_base = block.settings.app_base_url | strip -%}
   {%- if app_base == blank -%}
     <div style="border: 1px solid #f59e0b; border-radius: 8px; padding: 14px; margin: 12px 0; background: #fffbeb;">
@@ -6,7 +27,8 @@
     </div>
   {%- else -%}
     {%- assign clean_base = app_base | replace: '/order-edit', '' | replace: '//theme-order-edit-link', '/theme-order-edit-link' -%}
-    {%- assign encoded_return_to = request.path | url_encode -%}
+    {%- assign return_to_absolute = 'https://' | append: shop.permanent_domain | append: request.path -%}
+    {%- assign encoded_return_to = return_to_absolute | url_encode -%}
     {%- assign edit_href = clean_base
       | append: '/theme-order-edit-link?shop='
       | append: shop.permanent_domain
