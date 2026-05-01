@@ -88,6 +88,7 @@ export async function createEditSession({shop, orderId, customerEmail, settings}
       shop,
       orderId,
       status: "ACTIVE",
+      expiresAt: {gt: new Date()},
     },
     orderBy: {
       createdAt: "desc",
@@ -122,6 +123,7 @@ export async function createEditSessionFromOrderTime({
       shop,
       orderId,
       status: "ACTIVE",
+      expiresAt: {gt: new Date()},
     },
     orderBy: {
       createdAt: "desc",
