@@ -19,8 +19,10 @@ export const loader = async ({request}) => {
   const returnTo = safeReturnTo(shop, url.searchParams.get("return_to"));
   const embed = url.searchParams.get("embed");
   const frameParent = url.searchParams.get("frame_parent");
+  const validateOnly = url.searchParams.get("validate") === "1";
 
   if (!shop || !orderId) {
+    if (validateOnly) return toJson({ok: false, editable: false, reason: "invalid_link"});
     return redirect(withError(returnTo, "invalid_link"));
   }
 
@@ -49,6 +51,7 @@ export const loader = async ({request}) => {
 
     const order = orderData.order;
     if (!order || order.displayFulfillmentStatus !== "UNFULFILLED") {
+      if (validateOnly) return toJson({ok: false, editable: false, reason: "order_not_editable"});
       return redirect(withError(returnTo, "order_not_editable"));
     }
 
@@ -57,7 +60,17 @@ export const loader = async ({request}) => {
       ? new Date(createdAt.getTime() + Number(settings.editWindowMinutes || 30) * 60 * 1000)
       : null;
     if (expiryFromOrder && Date.now() >= expiryFromOrder.getTime()) {
+      if (validateOnly) return toJson({ok: false, editable: false, reason: "edit_window_expired"});
       return redirect(withError(returnTo, "edit_window_expired"));
+    }
+
+    if (validateOnly) {
+      return toJson({
+        ok: true,
+        editable: true,
+        reason: "",
+        expiresAt: expiryFromOrder ? expiryFromOrder.toISOString() : null,
+      });
     }
 
     const session = await createEditSessionFromOrderTime({
@@ -76,6 +89,7 @@ export const loader = async ({request}) => {
     }
     return redirect(dest);
   } catch {
+    if (validateOnly) return toJson({ok: false, editable: false, reason: "link_failed"});
     return redirect(withError(returnTo, "link_failed"));
   }
 };
@@ -123,4 +137,27 @@ function safeFrameParent(value) {
   } catch {
     return "";
   }
+}
+
+function toJson(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
+export function options() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
 }
