@@ -196,20 +196,11 @@ export const action = async ({params, request}) => {
 
   for (const line of lines) {
     const key = lineKey(line.id);
-    const nextQty = Number(form.get(`qty__${key}`) || line.quantity);
+    const submittedQty = Number(form.get(`qty__${key}`) || line.quantity);
+    const nextQty = Number.isFinite(submittedQty)
+      ? Math.max(1, submittedQty)
+      : line.quantity;
     const nextVariantId = String(form.get(`variant__${key}`) || line.variantId || "");
-    const removeChecked = String(form.get(`remove__${key}`) || "") === "on";
-
-    if (removeChecked || nextQty <= 0) {
-      removeIds.push(line.id);
-      operations.push({
-        type: "removeLineItem",
-        lineItemId: line.id,
-        variantId: line.variantId,
-        originalQuantity: line.quantity,
-      });
-      continue;
-    }
 
     if (nextVariantId && nextVariantId !== line.variantId) {
       removeIds.push(line.id);
@@ -513,7 +504,7 @@ export default function CustomerOrderEditPortal() {
                     <p style={{...ui.muted, fontSize: 13}}>Current: {line.variantTitle}</p>
                   </div>
                 </div>
-                <div style={{display: "grid", gridTemplateColumns: "1fr 130px auto", gap: 10, alignItems: "end"}}>
+                <div style={{display: "grid", gridTemplateColumns: "1fr 130px", gap: 10, alignItems: "end"}}>
                   <label style={ui.label}>
                     <span style={ui.labelText}>Variant</span>
                     <select name={`variant__${key}`} defaultValue={line.variantId || ""} style={ui.input}>
@@ -529,15 +520,11 @@ export default function CustomerOrderEditPortal() {
                     <input
                       name={`qty__${key}`}
                       type="number"
-                      min={0}
+                      min={1}
                       max={99}
                       defaultValue={line.quantity}
                       style={ui.input}
                     />
-                  </label>
-                  <label style={{display: "flex", alignItems: "center", gap: 8, paddingBottom: 8}}>
-                    <input name={`remove__${key}`} type="checkbox" />
-                    <span>Remove</span>
                   </label>
                 </div>
               </div>
