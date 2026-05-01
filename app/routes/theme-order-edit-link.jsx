@@ -17,6 +17,8 @@ export const loader = async ({request}) => {
   const shop = String(url.searchParams.get("shop") || "").trim();
   const orderId = normalizeOrderId(url.searchParams.get("orderId"));
   const returnTo = safeReturnTo(shop, url.searchParams.get("return_to"));
+  const embed = url.searchParams.get("embed");
+  const frameParent = url.searchParams.get("frame_parent");
 
   if (!shop || !orderId) {
     return redirect(withError(returnTo, "invalid_link"));
@@ -58,7 +60,13 @@ export const loader = async ({request}) => {
       orderCreatedAt: order.createdAt,
     });
 
-    return redirect(`/order-edit/${session.token}?shop=${encodeURIComponent(shop)}`);
+    let dest = `/order-edit/${session.token}?shop=${encodeURIComponent(shop)}`;
+    if (embed === "1") {
+      dest += "&embed=1";
+      const fp = safeFrameParent(frameParent);
+      if (fp) dest += `&frame_parent=${encodeURIComponent(fp)}`;
+    }
+    return redirect(dest);
   } catch {
     return redirect(withError(returnTo, "link_failed"));
   }
@@ -93,5 +101,18 @@ function withError(urlString, code) {
     return url.toString();
   } catch {
     return urlString;
+  }
+}
+
+/** HTTPS storefront origin only, for CSP frame-ancestors when embedding editor. */
+function safeFrameParent(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") return "";
+    return parsed.origin;
+  } catch {
+    return "";
   }
 }

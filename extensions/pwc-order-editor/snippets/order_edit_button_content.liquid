@@ -1,52 +1,142 @@
 {%- if customer and order -%}
-  <div id="order-edit-inline-error" style="display:none; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; padding:10px 12px; margin:12px 0;"></div>
-  <script>
-    (function () {
-      try {
-        var params = new URLSearchParams(window.location.search);
-        var code = params.get("order_edit_error");
-        if (!code) return;
-        var node = document.getElementById("order-edit-inline-error");
-        if (!node) return;
-        var messages = {
-          invalid_link: "This edit link is invalid. Please try again from your order page.",
-          order_not_editable: "This order can no longer be edited.",
-          link_failed: "We could not start order editing right now. Please try again."
-        };
-        node.textContent = messages[code] || "Unable to open order editor right now.";
-        node.style.display = "block";
-      } catch (e) {
-        // no-op
-      }
-    })();
-  </script>
-  {%- assign app_base = block.settings.app_base_url | strip -%}
-  {%- if app_base == blank -%}
-    <div style="border: 1px solid #f59e0b; border-radius: 8px; padding: 14px; margin: 12px 0; background: #fffbeb;">
-      Set <strong>App base URL</strong> in this block to enable order editing.
-    </div>
-  {%- else -%}
-    {%- assign clean_base = app_base | replace: '/order-edit', '' | replace: '//theme-order-edit-link', '/theme-order-edit-link' -%}
-    {%- assign return_to_absolute = 'https://' | append: shop.permanent_domain | append: request.path -%}
-    {%- assign encoded_return_to = return_to_absolute | url_encode -%}
-    {%- assign edit_href = clean_base
-      | append: '/theme-order-edit-link?shop='
-      | append: shop.permanent_domain
-      | append: '&orderId='
-      | append: order.id
-      | append: '&return_to='
-      | append: encoded_return_to
-    -%}
-    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin: 12px 0;">
-      <div style="font-weight: 600; margin-bottom: 8px;">
-        {{ block.settings.heading | escape }}
+  {%- assign ofs = order.id -%}
+  <div id="orderflex-order-edit-root-{{ ofs }}">
+    <div id="order-edit-inline-error-{{ ofs }}" style="display:none; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; padding:10px 12px; margin:12px 0;"></div>
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var code = params.get("order_edit_error");
+          if (!code) return;
+          var node = document.getElementById("order-edit-inline-error-{{ ofs }}");
+          if (!node) return;
+          var messages = {
+            invalid_link: "This edit link is invalid. Please try again from your order page.",
+            order_not_editable: "This order can no longer be edited.",
+            link_failed: "We could not start order editing right now. Please try again."
+          };
+          node.textContent = messages[code] || "Unable to open order editor right now.";
+          node.style.display = "block";
+        } catch (e) {
+          /* no-op */
+        }
+      })();
+    </script>
+    {%- assign app_base = block.settings.app_base_url | strip -%}
+    {%- if app_base == blank -%}
+      <div style="border: 1px solid #f59e0b; border-radius: 8px; padding: 14px; margin: 12px 0; background: #fffbeb;">
+        Set <strong>App base URL</strong> in this block to enable order editing.
       </div>
-      <a
-        href="{{ edit_href }}"
-        style="display:inline-block; text-decoration:none; background:#111827; color:#ffffff; padding:10px 14px; border-radius:6px; font-weight:600;"
+    {%- else -%}
+      {%- assign clean_base = app_base | replace: '/order-edit', '' | replace: '//theme-order-edit-link', '/theme-order-edit-link' -%}
+      {%- assign return_to_absolute = 'https://' | append: shop.permanent_domain | append: request.path -%}
+      {%- assign encoded_return_to = return_to_absolute | url_encode -%}
+      {%- assign frame_parent_enc = shop.url | url_encode -%}
+      {%- assign edit_href = clean_base
+        | append: '/theme-order-edit-link?shop='
+        | append: shop.permanent_domain
+        | append: '&orderId='
+        | append: order.id
+        | append: '&return_to='
+        | append: encoded_return_to
+        | append: '&embed=1&frame_parent='
+        | append: frame_parent_enc
+      -%}
+      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin: 12px 0;">
+        <div style="font-weight: 600; margin-bottom: 8px;">
+          {{ block.settings.heading | escape }}
+        </div>
+        <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px;">
+          Edit opens on this page in a full-screen panel.
+        </p>
+        <button
+          type="button"
+          class="orderflex-open-editor-{{ ofs }}"
+          data-orderflex-url="{{ edit_href | escape }}"
+          style="display:inline-block; border:none; cursor:pointer; background:#111827; color:#ffffff; padding:10px 14px; border-radius:6px; font-weight:600; font-size:15px;"
+        >
+          {{ block.settings.button_label | escape }}
+        </button>
+      </div>
+
+      <div
+        class="orderflex-editor-overlay-{{ ofs }}"
+        style="display:none; position:fixed; inset:0; z-index:2147483000; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:12px; box-sizing:border-box;"
+        aria-hidden="true"
       >
-        {{ block.settings.button_label | escape }}
-      </a>
-    </div>
-  {%- endif -%}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit order"
+          style="position:relative; width:100%; max-width:1100px; height:min(92vh, 900px); background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); display:flex; flex-direction:column;"
+        >
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-bottom:1px solid #e5e7eb; background:#f9fafb;">
+            <span style="font-weight:600; color:#111827;">{{ block.settings.button_label | escape }}</span>
+            <button
+              type="button"
+              class="orderflex-close-editor-{{ ofs }}"
+              style="border:none; background:#e5e7eb; color:#111827; border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer;"
+            >
+              Close
+            </button>
+          </div>
+          <iframe
+            class="orderflex-editor-frame-{{ ofs }}"
+            title="{{ block.settings.button_label | escape }}"
+            style="flex:1; width:100%; border:0; background:#f3f4f6;"
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+          ></iframe>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          var id = "{{ ofs }}";
+          var openBtn = document.querySelector(".orderflex-open-editor-" + id);
+          var overlay = document.querySelector(".orderflex-editor-overlay-" + id);
+          var closeBtn = document.querySelector(".orderflex-close-editor-" + id);
+          var frame = document.querySelector(".orderflex-editor-frame-" + id);
+          if (!openBtn || !overlay || !closeBtn || !frame) return;
+
+          var url = openBtn.getAttribute("data-orderflex-url");
+          if (!url) return;
+
+          function openPanel() {
+            overlay.style.display = "flex";
+            overlay.setAttribute("aria-hidden", "false");
+            if (!frame.getAttribute("src")) {
+              frame.setAttribute("src", url);
+            }
+            document.documentElement.style.overflow = "hidden";
+          }
+
+          function closePanel() {
+            overlay.style.display = "none";
+            overlay.setAttribute("aria-hidden", "true");
+            document.documentElement.style.overflow = "";
+          }
+
+          openBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            openPanel();
+          });
+
+          closeBtn.addEventListener("click", function () {
+            closePanel();
+          });
+
+          overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) closePanel();
+          });
+
+          document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && overlay.style.display === "flex") {
+              closePanel();
+            }
+          });
+        })();
+      </script>
+    {%- endif -%}
+  </div>
 {%- endif -%}
