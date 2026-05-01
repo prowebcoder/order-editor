@@ -77,7 +77,7 @@
           {{ block.settings.heading | escape }}
         </div>
         <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px;">
-          Edit opens on this page (full-screen panel). Ensure <strong>App base URL</strong> is exactly your app hostname, including <code>https://</code>.
+          Opens as a fullscreen popup on top of your order details. Confirm <strong>App base URL</strong> matches your deployed app (<code>https://…</code>).
         </p>
         <button
           type="button"
@@ -91,21 +91,22 @@
 
       <div
         class="orderflex-editor-overlay-{{ ofs }}"
-        style="display:none; position:fixed; inset:0; z-index:2147483000; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:12px; box-sizing:border-box;"
+        style="display:none;"
         aria-hidden="true"
+        data-orderflex-root="1"
       >
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Edit order"
-          style="position:relative; width:100%; max-width:1100px; height:min(92vh, 900px); background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); display:flex; flex-direction:column;"
+          aria-label="{{ block.settings.button_label | escape }}"
+          style="position:relative; width:100%; max-width:1100px; height:min(92vh, 900px); max-height:100%; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 80px rgba(0,0,0,0.35); display:flex; flex-direction:column; z-index:1; isolation:isolate; pointer-events:auto;"
         >
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-bottom:1px solid #e5e7eb; background:#f9fafb;">
-            <span style="font-weight:600; color:#111827;">{{ block.settings.button_label | escape }}</span>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; border-bottom:1px solid #e5e7eb; background:#ffffff; flex-shrink:0;">
+            <span style="font-weight:600; color:#111827; font-size:16px;">{{ block.settings.button_label | escape }}</span>
             <button
               type="button"
               class="orderflex-close-editor-{{ ofs }}"
-              style="border:none; background:#e5e7eb; color:#111827; border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer;"
+              style="border:none; background:#e5e7eb; color:#111827; border-radius:8px; padding:8px 14px; font-weight:600; cursor:pointer; font-size:14px;"
             >
               Close
             </button>
@@ -113,7 +114,7 @@
           <iframe
             class="orderflex-editor-frame-{{ ofs }}"
             title="{{ block.settings.button_label | escape }}"
-            style="flex:1; width:100%; border:0; background:#f3f4f6;"
+            style="flex:1; width:100%; min-height:0; border:0; background:#ffffff; display:block; opacity:1;"
             loading="lazy"
             referrerpolicy="strict-origin-when-cross-origin"
           ></iframe>
@@ -147,19 +148,47 @@
           var url = repairEditorUrl(openBtn.getAttribute("data-orderflex-url"));
           if (!url) return;
 
+          /** Move overlay to <body> so theme footers/sticky bars cannot paint above us (fixed + z-index inside sections is trapped). */
+          function portalOverlayToBody(host) {
+            if (host.getAttribute("data-orderflex-portaled") === "1") return;
+            host.setAttribute("data-orderflex-portaled", "1");
+            host.style.position = "fixed";
+            host.style.top = "0";
+            host.style.left = "0";
+            host.style.right = "0";
+            host.style.bottom = "0";
+            host.style.width = "100vw";
+            host.style.height = "100vh";
+            host.style.margin = "0";
+            host.style.padding = "16px";
+            host.style.boxSizing = "border-box";
+            host.style.flexDirection = "row";
+            host.style.flexWrap = "nowrap";
+            host.style.alignItems = "center";
+            host.style.justifyContent = "center";
+            host.style.backgroundColor = "rgba(15, 23, 42, 0.78)";
+            host.style.zIndex = "2147483647";
+            host.style.isolation = "isolate";
+            host.style.overflow = "auto";
+            document.body.appendChild(host);
+          }
+
           function openPanel() {
+            portalOverlayToBody(overlay);
             overlay.style.display = "flex";
             overlay.setAttribute("aria-hidden", "false");
             if (!frame.getAttribute("src")) {
               frame.setAttribute("src", url);
             }
             document.documentElement.style.overflow = "hidden";
+            document.body.style.overflow = "hidden";
           }
 
           function closePanel() {
             overlay.style.display = "none";
             overlay.setAttribute("aria-hidden", "true");
             document.documentElement.style.overflow = "";
+            document.body.style.overflow = "";
           }
 
           openBtn.addEventListener("click", function (e) {
