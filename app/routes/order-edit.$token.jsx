@@ -1,4 +1,4 @@
-import {Form, redirect, useActionData, useLoaderData} from "react-router";
+import {Form, useActionData, useLoaderData} from "react-router";
 import {useEffect, useMemo, useState} from "react";
 import {unauthenticated} from "../shopify.server";
 import {
@@ -285,18 +285,6 @@ export const action = async ({params, request}) => {
     });
     await markEditSessionUsed(session.id, "COMPLETED");
 
-    /** Session is now COMPLETED; revalidating this route would load the portal again and yield 410. Send customer to the order status page instead. */
-    const statusUrl = String(order?.statusPageUrl || "").trim();
-    if (/^https:\/\//i.test(statusUrl) || /^http:\/\//i.test(statusUrl)) {
-      try {
-        const next = new URL(statusUrl);
-        next.searchParams.set("orderflex", "updated");
-        return redirect(next.toString());
-      } catch {
-        return redirect(statusUrl);
-      }
-    }
-
     return {
       ok: true,
       message: outstanding > 0
@@ -305,6 +293,7 @@ export const action = async ({params, request}) => {
           ? "Order updated. Merchant should issue a partial refund for the reduced total."
           : "Order updated successfully.",
       outstanding,
+      completed: true,
     };
   } catch (error) {
     await logOrderEdit({
@@ -341,6 +330,17 @@ export default function CustomerOrderEditPortal() {
     const timer = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!actionData?.ok || !actionData?.completed) return;
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({type: "ORDERFLEX_EDIT_COMPLETE"}, "*");
+      return;
+    }
+    if (order?.statusPageUrl) {
+      window.location.href = order.statusPageUrl;
+    }
+  }, [actionData, order?.statusPageUrl]);
 
   const selectedUpsellProduct = useMemo(
     () => upsellProducts.find((p) => p.id === selectedUpsellProductId) || null,

@@ -1,7 +1,7 @@
 import {redirect} from "react-router";
 import {unauthenticated} from "../shopify.server";
 import {getSettings} from "../services/orderflex-settings.server";
-import {createEditSession} from "../services/orderflex-order.server";
+import {createEditSessionFromOrderTime} from "../services/orderflex-order.server";
 
 async function adminGraphql(admin, query, variables = {}) {
   const response = await admin.graphql(query, {variables});
@@ -52,12 +52,20 @@ export const loader = async ({request}) => {
       return redirect(withError(returnTo, "order_not_editable"));
     }
 
-    /** Theme/account page opens can be days after checkout; expiry must count from click, not order time. */
-    const session = await createEditSession({
+    const createdAt = order.createdAt ? new Date(order.createdAt) : null;
+    const expiryFromOrder = createdAt
+      ? new Date(createdAt.getTime() + Number(settings.editWindowMinutes || 30) * 60 * 1000)
+      : null;
+    if (expiryFromOrder && Date.now() >= expiryFromOrder.getTime()) {
+      return redirect(withError(returnTo, "edit_window_expired"));
+    }
+
+    const session = await createEditSessionFromOrderTime({
       shop,
       orderId,
       customerEmail: order.customer?.defaultEmailAddress?.emailAddress || null,
       settings,
+      orderCreatedAt: order.createdAt,
     });
 
     let dest = `/order-edit/${session.token}?shop=${encodeURIComponent(shop)}`;

@@ -13,6 +13,7 @@
           var messages = {
             invalid_link: "This edit link is invalid. Please try again from your order page.",
             order_not_editable: "This order can no longer be edited.",
+            edit_window_expired: "The edit window for this order has expired.",
             link_failed: "We could not start order editing right now. Please try again."
           };
           node.textContent = messages[code] || "Unable to open order editor right now.";
@@ -189,6 +190,7 @@
             overlay.setAttribute("aria-hidden", "true");
             document.documentElement.style.overflow = "";
             document.body.style.overflow = "";
+            try { frame.removeAttribute("src"); } catch (e) {}
           }
 
           openBtn.addEventListener("click", function (e) {
@@ -208,6 +210,13 @@
             if (e.key === "Escape" && overlay.style.display === "flex") {
               closePanel();
             }
+          });
+
+          window.addEventListener("message", function (event) {
+            var data = event && event.data ? event.data : null;
+            if (!data || data.type !== "ORDERFLEX_EDIT_COMPLETE") return;
+            closePanel();
+            window.location.reload();
           });
         })();
       </script>
