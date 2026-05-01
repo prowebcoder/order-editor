@@ -456,7 +456,7 @@ export function InlineOrderEditor() {
 
             <s-box border="base" borderRadius="base" padding="base">
               <s-details>
-                <s-summary>Update products — variant, quantity, remove</s-summary>
+                <s-summary>Update products — variant and quantity</s-summary>
               <s-stack gap="small">
             {state.lines.map((line) => {
               const lineDraft = draft.lineChanges.find((item) => item.lineItemId === line.id);
@@ -487,17 +487,10 @@ export function InlineOrderEditor() {
                     <s-number-field
                       label="Quantity"
                       value={String(lineDraft?.quantity ?? line.quantity)}
-                      min={0}
+                      min={1}
                       max={99}
                       onChange={(event) =>
-                        patchLine(line.id, {quantity: Number(event.currentTarget.value || 0)})
-                      }
-                    />
-                    <s-checkbox
-                      label="Remove this line item"
-                      checked={Boolean(lineDraft?.remove)}
-                      onChange={(event) =>
-                        patchLine(line.id, {remove: Boolean(event.currentTarget.checked)})
+                        patchLine(line.id, {quantity: Math.max(1, Number(event.currentTarget.value || 1))})
                       }
                     />
                   </s-stack>
@@ -508,7 +501,11 @@ export function InlineOrderEditor() {
                 disabled={secondsLeft <= 0 || !state.settings?.allowProductEdit}
                 onClick={() =>
                   mutate("apply-edit", {
-                    lineChanges: draft.lineChanges,
+                    lineChanges: draft.lineChanges.map((line) => ({
+                      ...line,
+                      remove: false,
+                      quantity: Math.max(1, Number(line.quantity || 1)),
+                    })),
                     additions: [],
                   })}
               >
