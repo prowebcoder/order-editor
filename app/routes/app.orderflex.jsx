@@ -94,9 +94,8 @@ export const action = async ({request}) => {
 };
 
 export default function OrderFlexAdmin() {
-  const {settings, products, collections} = useLoaderData();
+  const {shop, settings, products, collections} = useLoaderData();
   const actionData = useActionData();
-  const [activeTab, setActiveTab] = useState("general");
   const [selectedProducts, setSelectedProducts] = useState(
     (settings.upsellProductIds || []).map((id) => {
       const existing = products.find((p) => p.id === id);
@@ -165,56 +164,28 @@ export default function OrderFlexAdmin() {
   }
 
   return (
-    <s-page heading="OrderFlex">
-      <s-section heading="Settings categories">
-        <s-stack direction="inline" gap="small">
-          <s-button
-            type="button"
-            variant={activeTab === "general" ? "primary" : "secondary"}
-            onClick={() => setActiveTab("general")}
-          >
-            General settings
-          </s-button>
-          <s-button
-            type="button"
-            variant={activeTab === "checkout" ? "primary" : "secondary"}
-            onClick={() => setActiveTab("checkout")}
-          >
-            Checkout customization
-          </s-button>
-          <s-button
-            type="button"
-            variant={activeTab === "theme" ? "primary" : "secondary"}
-            onClick={() => setActiveTab("theme")}
-          >
-            Theme app extension
-          </s-button>
-        </s-stack>
-      </s-section>
+    <s-page heading="Settings">
+      <Form method="post">
+        <input type="hidden" name="intent" value="save-settings" />
+        <input type="hidden" name="upsellProductIds" value={selectedProducts.map((item) => item.id).join(",")} />
+        <input
+          type="hidden"
+          name="upsellCollectionIds"
+          value={selectedCollections.map((item) => item.id).join(",")}
+        />
 
-      <s-section heading={activeTab === "general" ? "General settings" : activeTab === "checkout" ? "Checkout customization" : "Theme app extension"}>
-        <Form method="post">
-          <input type="hidden" name="intent" value="save-settings" />
-          <input
-            type="hidden"
-            name="upsellProductIds"
-            value={selectedProducts.map((item) => item.id).join(",")}
-          />
-          <input
-            type="hidden"
-            name="upsellCollectionIds"
-            value={selectedCollections.map((item) => item.id).join(",")}
-          />
-          <s-stack gap="base">
-            {activeTab === "general" ? (
-              <>
-                <s-number-field
-                  label="Edit window duration (minutes)"
-                  name="editWindowMinutes"
-                  value={String(settings.editWindowMinutes)}
-                  min={1}
-                  max={240}
-                />
+        <s-section heading="General controls">
+          <s-grid gap="base">
+            <s-number-field
+              label="Edit window duration (minutes)"
+              name="editWindowMinutes"
+              value={String(settings.editWindowMinutes)}
+              min={1}
+              max={240}
+              details="Customers can edit orders only during this time window."
+            />
+            <s-box border="base" borderRadius="base" padding="base">
+              <s-grid gap="small">
                 <label>
                   <input type="checkbox" name="allowAddressEdit" defaultChecked={settings.allowAddressEdit} />
                   <span> Enable address editing</span>
@@ -227,80 +198,102 @@ export default function OrderFlexAdmin() {
                   <input type="checkbox" name="allowDiscountCodes" defaultChecked={settings.allowDiscountCodes} />
                   <span> Enable discount codes</span>
                 </label>
-                <s-banner>
-                  These settings apply to order status and thank-you order editing behavior.
-                </s-banner>
-              </>
-            ) : null}
+              </s-grid>
+            </s-box>
+          </s-grid>
+        </s-section>
 
-            {activeTab === "checkout" ? (
-              <>
-                <label>
-                  <input type="checkbox" name="enableUpsells" defaultChecked={settings.enableUpsells} />
-                  <span> Enable upsells in checkout</span>
-                </label>
-                <s-text-field
-                  label="Checkout offer heading"
-                  name="checkoutOfferHeading"
-                  defaultValue={settings.checkoutOfferHeading || "Add the finishing touch"}
-                />
-                <s-stack gap="small">
-                  <s-text>Upsell products</s-text>
+        <s-section heading="Checkout customization">
+          <s-grid gap="base">
+            <label>
+              <input type="checkbox" name="enableUpsells" defaultChecked={settings.enableUpsells} />
+              <span> Enable upsells in checkout</span>
+            </label>
+            <s-text-field
+              label="Checkout offer heading"
+              name="checkoutOfferHeading"
+              defaultValue={settings.checkoutOfferHeading || "Add the finishing touch"}
+              details="This heading appears above offer recommendations in checkout."
+            />
+
+            <s-box border="base" borderRadius="base" padding="base">
+              <s-grid gap="small">
+                <s-grid columns="1fr auto" alignItems="center">
+                  <s-heading>Upsell products</s-heading>
                   <s-button type="button" variant="secondary" onClick={pickProducts}>
                     Select products
                   </s-button>
-                  {selectedProducts.length ? (
-                    <s-text type="small">
-                      {selectedProducts.map((item) => item.title).join(", ")}
-                    </s-text>
-                  ) : (
-                    <s-text type="small">No products selected.</s-text>
-                  )}
-                </s-stack>
-                <s-stack gap="small">
-                  <s-text>Upsell collections</s-text>
+                </s-grid>
+                {selectedProducts.length ? (
+                  <s-unordered-list>
+                    {selectedProducts.map((item) => (
+                      <s-list-item key={item.id}>{item.title}</s-list-item>
+                    ))}
+                  </s-unordered-list>
+                ) : (
+                  <s-text color="subdued">No products selected.</s-text>
+                )}
+              </s-grid>
+            </s-box>
+
+            <s-box border="base" borderRadius="base" padding="base">
+              <s-grid gap="small">
+                <s-grid columns="1fr auto" alignItems="center">
+                  <s-heading>Upsell collections</s-heading>
                   <s-button type="button" variant="secondary" onClick={pickCollections}>
                     Select collections
                   </s-button>
-                  {selectedCollections.length ? (
-                    <s-text type="small">
-                      {selectedCollections.map((item) => item.title).join(", ")}
-                    </s-text>
-                  ) : (
-                    <s-text type="small">No collections selected.</s-text>
-                  )}
-                </s-stack>
-              </>
-            ) : null}
-
-            {activeTab === "theme" ? (
-              <s-stack gap="small">
-                <s-banner>
-                  Use this for legacy customer accounts. Add the app blocks in your theme editor on
-                  `customers/order` and `customers/account`.
-                </s-banner>
-                <s-text>
-                  Keep your block setting `App base URL` aligned with your live app host.
-                </s-text>
-                <s-link href="/app/orderflex">
-                  Save settings in other tabs, then configure blocks in Theme Editor.
-                </s-link>
-              </s-stack>
-            ) : null}
-
-            {pickerError ? <s-banner tone="critical">{pickerError}</s-banner> : null}
-            <s-button type="submit">Save settings</s-button>
-          </s-stack>
-        </Form>
-      </s-section>
-
-      {actionData?.message ? (
-        <s-section heading="Result">
-          <s-banner tone={actionData.ok ? "success" : "critical"}>
-            {actionData.message}
-          </s-banner>
+                </s-grid>
+                {selectedCollections.length ? (
+                  <s-unordered-list>
+                    {selectedCollections.map((item) => (
+                      <s-list-item key={item.id}>{item.title}</s-list-item>
+                    ))}
+                  </s-unordered-list>
+                ) : (
+                  <s-text color="subdued">No collections selected.</s-text>
+                )}
+              </s-grid>
+            </s-box>
+          </s-grid>
         </s-section>
-      ) : null}
+
+        <s-section heading="Theme extension guidance">
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-300">
+              <s-paragraph color="subdued">
+                Use this only for legacy customer accounts and keep the app base URL synced with your live host.
+              </s-paragraph>
+              <s-unordered-list>
+                <s-list-item>Add blocks on `customers/order` and `customers/account` templates.</s-list-item>
+                <s-list-item>Verify app URL whenever your tunnel or host changes.</s-list-item>
+                <s-list-item>Publish theme changes after testing one order flow.</s-list-item>
+              </s-unordered-list>
+            </s-grid>
+          </s-box>
+        </s-section>
+
+        {pickerError ? (
+          <s-section>
+            <s-banner tone="critical">{pickerError}</s-banner>
+          </s-section>
+        ) : null}
+
+        {actionData?.message ? (
+          <s-section>
+            <s-banner tone={actionData.ok ? "success" : "critical"}>{actionData.message}</s-banner>
+          </s-section>
+        ) : null}
+
+        <s-section>
+          <s-grid columns="1fr auto" alignItems="center">
+            <s-text color="subdued">Store: {shop}</s-text>
+            <s-button type="submit" variant="primary">
+              Save settings
+            </s-button>
+          </s-grid>
+        </s-section>
+      </Form>
     </s-page>
   );
 }
