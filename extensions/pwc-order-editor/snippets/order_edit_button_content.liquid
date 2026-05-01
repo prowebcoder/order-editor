@@ -25,13 +25,43 @@
     {%- assign app_base = block.settings.app_base_url | strip -%}
     {%- if app_base == blank -%}
       <div style="border: 1px solid #f59e0b; border-radius: 8px; padding: 14px; margin: 12px 0; background: #fffbeb;">
-        Set <strong>App base URL</strong> in this block to enable order editing.
+        Set <strong>App base URL</strong> in this block to enable order editing (example: <code>https://your-app.vercel.app</code>).
       </div>
     {%- else -%}
-      {%- assign clean_base = app_base | replace: '/order-edit', '' | replace: '//theme-order-edit-link', '/theme-order-edit-link' -%}
+      {%- comment -%}
+        DO NOT pipe replace '//...' across the whole URL — that can corrupt `https://` into `https:/`.
+        Only strip whitespace and optionally remove a trailing /order-edit path suffix.
+      {%- endcomment -%}
+      {%- assign clean_base = app_base | strip -%}
+      {%- assign suf = '/order-edit' -%}
+      {%- assign suf_len = suf | size -%}
+      {%- assign cb_len = clean_base | size -%}
+      {%- if cb_len >= suf_len -%}
+        {%- assign start = cb_len | minus: suf_len -%}
+        {%- assign tail_suf = clean_base | slice: start, suf_len -%}
+        {%- if tail_suf == suf -%}
+          {%- assign clean_base = clean_base | slice: 0, start | strip -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- for _i in (1..4) -%}
+        {%- assign _last_ch = clean_base | slice: -1, 1 -%}
+        {%- if _last_ch == '/' -%}
+          {%- assign _clen = clean_base | size | minus: 1 -%}
+          {%- if _clen >= 8 -%}
+            {%- assign clean_base = clean_base | slice: 0, _clen | strip -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- assign frame_parent_origin = shop.url | strip -%}
+      {%- if request.origin != blank -%}
+        {%- assign frame_parent_origin = request.origin | strip -%}
+      {%- endif -%}
       {%- assign return_to_absolute = 'https://' | append: shop.permanent_domain | append: request.path -%}
+      {%- if request.origin != blank -%}
+        {%- assign return_to_absolute = request.origin | append: request.path -%}
+      {%- endif -%}
       {%- assign encoded_return_to = return_to_absolute | url_encode -%}
-      {%- assign frame_parent_enc = shop.url | url_encode -%}
+      {%- assign frame_parent_enc = frame_parent_origin | url_encode -%}
       {%- assign edit_href = clean_base
         | append: '/theme-order-edit-link?shop='
         | append: shop.permanent_domain
@@ -47,7 +77,7 @@
           {{ block.settings.heading | escape }}
         </div>
         <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px;">
-          Edit opens on this page in a full-screen panel.
+          Edit opens on this page (full-screen panel). Ensure <strong>App base URL</strong> is exactly your app hostname, including <code>https://</code>.
         </p>
         <button
           type="button"
@@ -92,6 +122,21 @@
 
       <script>
         (function () {
+          function repairEditorUrl(raw) {
+            if (!raw) return raw;
+            var u = String(raw).trim();
+            // Common Liquid mistake: `https:/host` (only one slash after scheme)
+            if (/^https:\/[^\/]/i.test(u)) {
+              u = "https://" + u.slice("https:/".length);
+            }
+            if (/^http:\/[^\/]/i.test(u)) {
+              u = "http://" + u.slice("http:/".length);
+            }
+            // Collapse accidental triple slashes after scheme
+            u = u.replace(/^https:\/\/\/+/i, "https://").replace(/^http:\/\/\/+/i, "http://");
+            return u;
+          }
+
           var id = "{{ ofs }}";
           var openBtn = document.querySelector(".orderflex-open-editor-" + id);
           var overlay = document.querySelector(".orderflex-editor-overlay-" + id);
@@ -99,7 +144,7 @@
           var frame = document.querySelector(".orderflex-editor-frame-" + id);
           if (!openBtn || !overlay || !closeBtn || !frame) return;
 
-          var url = openBtn.getAttribute("data-orderflex-url");
+          var url = repairEditorUrl(openBtn.getAttribute("data-orderflex-url"));
           if (!url) return;
 
           function openPanel() {
