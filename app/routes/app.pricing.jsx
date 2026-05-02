@@ -223,8 +223,6 @@ const APP_FEATURES = [
   "Checkout banners and trust surfaces alongside post-checkout/targeted placements",
 
   "Theme extension entry points where you configure them",
-
-  "Optional international address validation: US $0.01, AU $0.015, NZ $0.03, GB $0.03 per lookup when enabled (other regions billed at $0.02). Charged monthly as Shopify usage until the billing cap.",
 ];
 
 export const loader = async ({ request }) => {
@@ -313,8 +311,6 @@ export default function PricingPage() {
         trialFooter: "7-day free trial",
 
         featuredText: null,
-
-        supportLine: "Email support from the developer",
       },
 
       {
@@ -335,9 +331,6 @@ export default function PricingPage() {
         trialFooter: "14-day free trial",
 
         featuredText: "Most popular",
-
-        supportLine:
-          "Shared Slack channel with the team; onboarding session included",
       },
 
       {
@@ -358,9 +351,6 @@ export default function PricingPage() {
         trialFooter: "14-day free trial",
 
         featuredText: null,
-
-        supportLine:
-          "Shared Slack channel with the team; onboarding session included",
       },
 
       {
@@ -381,9 +371,6 @@ export default function PricingPage() {
         trialFooter: "14-day free trial",
 
         featuredText: null,
-
-        supportLine:
-          "Priority 24/7 support via Slack; onboarding session included",
       },
     ],
 
@@ -551,11 +538,7 @@ export default function PricingPage() {
                 buttonLabel = isYear ? "Active (yearly)" : "Active (monthly)";
               }
 
-              const features = [
-                ...APP_FEATURES,
-
-                `Support: ${plan.supportLine}`,
-              ];
+              const features = [...APP_FEATURES];
 
               return (
                 <div
