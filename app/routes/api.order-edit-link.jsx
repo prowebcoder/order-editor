@@ -144,7 +144,6 @@ export const action = async ({request}) => {
       }
       await updateOrderDetails({admin, orderId: session.orderId, updates: {shippingAddress}});
       await tryRecordAddressValidationAfterShippingSave(admin, {
-        settings,
         orderId: session.orderId,
         shippingAddress,
       });

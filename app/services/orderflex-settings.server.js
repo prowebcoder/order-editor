@@ -10,7 +10,6 @@ const DEFAULT_SETTINGS = {
   upsellProductIds: [],
   upsellCollectionIds: [],
   checkoutOfferHeading: "Add the finishing touch",
-  enableAddressValidationBilling: false,
 };
 
 export async function getSettings(shop) {
@@ -26,7 +25,6 @@ export async function getSettings(shop) {
         allowDiscountCodes: DEFAULT_SETTINGS.allowDiscountCodes,
         upsellProductIds: JSON.stringify(DEFAULT_SETTINGS.upsellProductIds),
         upsellCollectionIds: JSON.stringify(DEFAULT_SETTINGS.upsellCollectionIds),
-        enableAddressValidationBilling: DEFAULT_SETTINGS.enableAddressValidationBilling,
       },
     });
     return normalizeSettings(
@@ -60,10 +58,6 @@ export async function updateSettings(shop, payload) {
     checkoutOfferHeading: String(
       payload.checkoutOfferHeading ?? current.checkoutOfferHeading ?? DEFAULT_SETTINGS.checkoutOfferHeading,
     ).trim() || DEFAULT_SETTINGS.checkoutOfferHeading,
-    enableAddressValidationBilling:
-      payload.enableAddressValidationBilling !== undefined
-        ? Boolean(payload.enableAddressValidationBilling)
-        : Boolean(current.enableAddressValidationBilling),
   };
 
   const updated = await db.appSettings.upsert({
@@ -77,7 +71,6 @@ export async function updateSettings(shop, payload) {
       allowDiscountCodes: Boolean(merged.allowDiscountCodes),
       upsellProductIds: JSON.stringify(merged.upsellProductIds),
       checkoutMerchandisingJson: nextMerchandisingJson ?? "{}",
-      enableAddressValidationBilling: Boolean(merged.enableAddressValidationBilling),
     },
     update: {
       editWindowMinutes: merged.editWindowMinutes,
@@ -86,7 +79,6 @@ export async function updateSettings(shop, payload) {
       enableUpsells: Boolean(merged.enableUpsells),
       allowDiscountCodes: Boolean(merged.allowDiscountCodes),
       upsellProductIds: JSON.stringify(merged.upsellProductIds),
-      enableAddressValidationBilling: Boolean(merged.enableAddressValidationBilling),
       ...(nextMerchandisingJson != null ? {checkoutMerchandisingJson: nextMerchandisingJson} : {}),
     },
   });

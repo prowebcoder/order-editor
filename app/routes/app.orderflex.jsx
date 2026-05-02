@@ -105,8 +105,6 @@ export const action = async ({request}) => {
     upsellProductIds,
     upsellCollectionIds,
     checkoutOfferHeading: String(form.get("checkoutOfferHeading") || "").trim() || currentSettings.checkoutOfferHeading,
-    enableAddressValidationBilling:
-      String(form.get("enableAddressValidationBilling") || "") === "true",
   });
 
   return {
@@ -145,9 +143,6 @@ export default function OrderFlexAdmin() {
 
   const [editWindowMinutes, setEditWindowMinutes] = useState(loaderSettings.editWindowMinutes);
   const [allowAddressEdit, setAllowAddressEdit] = useState(loaderSettings.allowAddressEdit);
-  const [enableAddressValidationBilling, setEnableAddressValidationBilling] = useState(
-    !!loaderSettings.enableAddressValidationBilling,
-  );
   const [allowProductEdit, setAllowProductEdit] = useState(loaderSettings.allowProductEdit);
   const [allowDiscountCodes, setAllowDiscountCodes] = useState(loaderSettings.allowDiscountCodes);
   const [enableUpsells, setEnableUpsells] = useState(loaderSettings.enableUpsells);
@@ -160,10 +155,6 @@ export default function OrderFlexAdmin() {
   const [selectedCollections, setSelectedCollections] = useState(() =>
     pickInitialSelection(loaderSettings.upsellCollectionIds || [], collections),
   );
-
-  useEffect(() => {
-    setEnableAddressValidationBilling(!!loaderSettings.enableAddressValidationBilling);
-  }, [loaderSettings.enableAddressValidationBilling]);
 
   const [pickerError, setPickerError] = useState("");
   const [showSavedBanner, setShowSavedBanner] = useState(false);
@@ -189,7 +180,6 @@ export default function OrderFlexAdmin() {
     const s = fetcher.data.settings;
     setEditWindowMinutes(s.editWindowMinutes);
     setAllowAddressEdit(!!s.allowAddressEdit);
-    setEnableAddressValidationBilling(!!s.enableAddressValidationBilling);
     setAllowProductEdit(!!s.allowProductEdit);
     setAllowDiscountCodes(!!s.allowDiscountCodes);
     setEnableUpsells(!!s.enableUpsells);
@@ -244,7 +234,6 @@ export default function OrderFlexAdmin() {
     fd.append("intent", "save-settings");
     fd.append("editWindowMinutes", String(editWindowMinutes));
     fd.append("allowAddressEdit", allowAddressEdit ? "true" : "false");
-    fd.append("enableAddressValidationBilling", enableAddressValidationBilling ? "true" : "false");
     fd.append("allowProductEdit", allowProductEdit ? "true" : "false");
     fd.append("allowDiscountCodes", allowDiscountCodes ? "true" : "false");
     fd.append("enableUpsells", enableUpsells ? "true" : "false");
@@ -431,24 +420,19 @@ export default function OrderFlexAdmin() {
 
               <s-box padding="base" background="subdued" borderRadius="base">
                 <s-stack direction="block" gap="small-200">
-                  <s-switch
-                    label="Bill usage when customers save shipping address updates"
-                    checked={enableAddressValidationBilling}
-                    disabled={!allowAddressEdit}
-                    onChange={(e) => setEnableAddressValidationBilling(getCheckboxLikeValue(e))}
-                  />
+                  <s-heading>Address validation usage</s-heading>
                   <s-text variant="bodySm" tone="subdued">
-                    Uses the address-validation usage rates shown on Pricing (monthly plan cap). Retries with the same
-                    address payload reuse one idempotent charge.
+                    Plan usage applies when shoppers save shipping address changes (rates and monthly cap match your Pricing
+                    page). Duplicate submits for the same address do not bill twice.
                   </s-text>
                   {!allowAddressEdit ? (
                     <s-text variant="bodySm" tone="subdued">
-                      Turn on address editing above to use usage billing on saves.
+                      Enable address editing above for customers to update shipping addresses.
                     </s-text>
                   ) : addressValidationUsage?.ok ? (
                     <s-stack direction="block" gap="small-100">
                       <s-text variant="bodySm" fontWeight="semibold">
-                        Address validation usage (this billing period)
+                        This billing period
                       </s-text>
                       <s-text variant="bodySm">
                         Used:{" "}
@@ -456,7 +440,7 @@ export default function OrderFlexAdmin() {
                           {addressValidationUsage.usedAmount.toFixed(2)} {addressValidationUsage.currencyCode}
                         </s-text>
                         {" · "}
-                        Plan cap remaining:{" "}
+                        Remaining before cap:{" "}
                         <s-text variant="bodySm" fontWeight="semibold">
                           {Math.max(
                             0,
@@ -465,14 +449,16 @@ export default function OrderFlexAdmin() {
                           {addressValidationUsage.currencyCode}
                         </s-text>
                         {" "}
-                        (cap {addressValidationUsage.capAmount.toFixed(2)} {addressValidationUsage.currencyCode} per cycle)
+                        (cycle cap {addressValidationUsage.capAmount.toFixed(2)} {addressValidationUsage.currencyCode})
                       </s-text>
                     </s-stack>
                   ) : (
-                    <s-text variant="bodySm" tone="subdued">
-                      {addressValidationUsage?.message ||
-                        "Open Pricing and confirm your plan to see usage and caps."}
-                    </s-text>
+                    <s-banner tone="info">
+                      <s-text variant="bodySm">
+                        {addressValidationUsage?.message ||
+                          "Confirm an active subscription on Pricing that includes address validation usage to see amounts here."}
+                      </s-text>
+                    </s-banner>
                   )}
                 </s-stack>
               </s-box>

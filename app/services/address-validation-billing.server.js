@@ -132,7 +132,7 @@ export async function getAddressValidationUsageSummary(admin) {
     return {
       ok: false,
       message:
-        "No active usage billing on your subscription yet. Confirm your plan on Pricing (plans include address validation usage with a monthly cap).",
+        "Usage totals appear here once your active plan includes address validation billing. If you haven’t subscribed yet, open Pricing and pick a tier.",
     };
   }
   const currencyCode = details.cappedAmount?.currencyCode || details.balanceUsed?.currencyCode || "USD";
@@ -217,12 +217,12 @@ export async function recordAddressValidationUsage(admin, params) {
 }
 
 /**
- * After a successful order shipping-address update: record usage when the shop opted in.
+ * After a successful order shipping-address update: record plan usage (rates/cap on Pricing).
  * Never throws — logs and continues so checkout/edit flows stay reliable.
  */
 export async function tryRecordAddressValidationAfterShippingSave(admin, ctx) {
-  const { settings, orderId, shippingAddress } = ctx;
-  if (!settings?.enableAddressValidationBilling || !shippingAddress?.countryCode) {
+  const { orderId, shippingAddress } = ctx;
+  if (!shippingAddress?.countryCode) {
     return;
   }
   try {
