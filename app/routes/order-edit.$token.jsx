@@ -1,6 +1,7 @@
 import {Form, useActionData, useLoaderData} from "react-router";
 import {useEffect, useMemo, useState} from "react";
 import {unauthenticated} from "../shopify.server";
+import {tryRecordAddressValidationAfterShippingSave} from "../services/address-validation-billing.server";
 import {
   getSessionAndOrder,
   executeOrderEdit,
@@ -164,6 +165,11 @@ export const action = async ({params, request}) => {
         admin,
         orderId: session.orderId,
         updates: {shippingAddress},
+      });
+      await tryRecordAddressValidationAfterShippingSave(admin, {
+        settings,
+        orderId: session.orderId,
+        shippingAddress,
       });
       return {ok: true, message: "Shipping address updated."};
     } catch (error) {

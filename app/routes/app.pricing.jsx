@@ -74,6 +74,23 @@ function subscriptionMatchesBillingKey(subscription, billingKey) {
   return name.includes(billingKey) || name.includes(needle);
 }
 
+function amountMatchesExpected(actual, expected) {
+  const a = Number.parseFloat(actual);
+  const e = Number.parseFloat(expected);
+  return (
+    Number.isFinite(a) && Number.isFinite(e) && Math.abs(a - e) < 0.02
+  );
+}
+
+function recurFromLineItem(li) {
+  const pd = li?.plan?.pricingDetails;
+  if (!pd || pd.__typename !== "AppRecurringPricing") return null;
+  return {
+    amount: pd.price?.amount,
+    interval: String(pd.interval || "").toUpperCase(),
+  };
+}
+
 function findActiveBillingKey(activeSubscriptions, keys) {
   const active =
     activeSubscriptions.find(
@@ -88,50 +105,67 @@ function findActiveBillingKey(activeSubscriptions, keys) {
     if (subscriptionMatchesBillingKey(active, key)) return key;
 
     for (const li of lineItems) {
-      const amount = Number(li?.plan?.pricingDetails?.price?.amount ?? "");
+      const recur = recurFromLineItem(li);
+      if (!recur) continue;
 
-      const interval = String(
-        li?.plan?.pricingDetails?.interval || "",
-      ).toUpperCase();
+      const {amount, interval} = recur;
 
-      if (
-        key.includes("starter") &&
-        interval === "EVERY_30_DAYS" &&
-        amount === 99
-      )
-        return key;
+      if (interval === "EVERY_30_DAYS") {
+        if (
+          key.includes("starter") &&
+          key.includes("monthly") &&
+          (amountMatchesExpected(amount, 29.99) ||
+            amountMatchesExpected(amount, 99))
+        )
+          return key;
+        if (
+          key.includes("growth") &&
+          key.includes("monthly") &&
+          (amountMatchesExpected(amount, 49.99) ||
+            amountMatchesExpected(amount, 199))
+        )
+          return key;
+        if (
+          key.includes("scale") &&
+          key.includes("monthly") &&
+          (amountMatchesExpected(amount, 99.99) ||
+            amountMatchesExpected(amount, 399))
+        )
+          return key;
+        if (
+          key.includes("pro") &&
+          key.includes("monthly") &&
+          (amountMatchesExpected(amount, 199.99) ||
+            amountMatchesExpected(amount, 599))
+        )
+          return key;
+      }
 
-      if (
-        key.includes("growth") &&
-        interval === "EVERY_30_DAYS" &&
-        amount === 199
-      )
-        return key;
-
-      if (
-        key.includes("scale") &&
-        interval === "EVERY_30_DAYS" &&
-        amount === 399
-      )
-        return key;
-
-      if (key.includes("pro") && interval === "EVERY_30_DAYS" && amount === 599)
-        return key;
-
-      if (
-        key.includes("yearly") ||
-        key.endsWith("_999") ||
-        key.endsWith("_1999")
-      ) {
-        if (interval === "ANNUAL") {
-          if (key.includes("starter") && amount === 999) return key;
-
-          if (key.includes("growth") && amount === 1999) return key;
-
-          if (key.includes("scale") && amount === 3999) return key;
-
-          if (key.includes("pro") && amount === 6000) return key;
-        }
+      if (interval === "ANNUAL") {
+        if (
+          key.includes("starter") &&
+          key.includes("yearly") &&
+          amountMatchesExpected(amount, 999)
+        )
+          return key;
+        if (
+          key.includes("growth") &&
+          key.includes("yearly") &&
+          amountMatchesExpected(amount, 1999)
+        )
+          return key;
+        if (
+          key.includes("scale") &&
+          key.includes("yearly") &&
+          amountMatchesExpected(amount, 3999)
+        )
+          return key;
+        if (
+          key.includes("pro") &&
+          key.includes("yearly") &&
+          amountMatchesExpected(amount, 6000)
+        )
+          return key;
       }
     }
   }
@@ -182,15 +216,15 @@ const APP_FEATURES = [
 
   "Edit rules: timing, address, products, discounts",
 
-  "Checkout upsell + post-checkout extensions",
+  "Checkout UI extensions on the Shopify Checkout page (during checkout): Shopify Plus only",
 
-  "Customer Account + order-status UI extensions",
+  "Post-checkout, Customer Account, and order-status UI extensions — where Shopify enables those surfaces",
 
-  "Checkout banners and trust surfaces (when configured)",
+  "Checkout banners and trust surfaces alongside post-checkout/targeted placements",
 
-  "Theme extension for storefront edit entry",
+  "Theme extension entry points where you configure them",
 
-  "Optional address validation (usage-based when enabled)",
+  "Optional international address validation: US $0.01, AU $0.015, NZ $0.03, GB $0.03 per lookup when enabled (other regions billed at $0.02). Charged monthly as Shopify usage until the billing cap.",
 ];
 
 export const loader = async ({ request }) => {
@@ -384,6 +418,15 @@ export default function PricingPage() {
             </s-text>
           </s-banner>
         ) : null}
+
+        <s-banner tone="info">
+          <s-text>
+            Shopify <strong>Plus</strong> is required for editable blocks on the Shopify{" "}
+            <strong>Checkout</strong> page (during checkout). Post-checkout surfaces, Customer
+            Account/order-status extensions, and the storefront theme embed remain available according
+            to your Shopify edition and storefront setup.
+          </s-text>
+        </s-banner>
 
         <div
           style={{

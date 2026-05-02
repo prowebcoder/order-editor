@@ -28,6 +28,17 @@ function resolveScopes() {
 
 const scopes = resolveScopes();
 
+/** Merchant-approved cap per billing interval for validation usage charges. */
+const ADDRESS_VALIDATION_USAGE_CAP_USD = 1000;
+
+const addressValidationUsageLine = {
+  interval: BillingInterval.Usage,
+  currencyCode: "USD",
+  amount: ADDRESS_VALIDATION_USAGE_CAP_USD,
+  terms:
+    "Per validated shipping address lookup when validation is enabled: US $0.01, AU $0.015, NZ $0.03, GB $0.03; other regions $0.02 (see app Pricing). Charges accrue monthly and cannot exceed this plan cap.",
+};
+
 export const BILLING_PLANS = {
   STARTER_MONTHLY: "starter_monthly_99",
   STARTER_YEARLY: "starter_yearly_999",
@@ -54,9 +65,10 @@ const shopify = shopifyApp({
       lineItems: [
         {
           interval: BillingInterval.Every30Days,
-          amount: 99,
+          amount: 29.99,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.STARTER_YEARLY]: {
@@ -67,6 +79,7 @@ const shopify = shopifyApp({
           amount: 999,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.GROWTH_MONTHLY]: {
@@ -74,9 +87,10 @@ const shopify = shopifyApp({
       lineItems: [
         {
           interval: BillingInterval.Every30Days,
-          amount: 199,
+          amount: 49.99,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.GROWTH_YEARLY]: {
@@ -87,6 +101,7 @@ const shopify = shopifyApp({
           amount: 1999,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.SCALE_MONTHLY]: {
@@ -94,9 +109,10 @@ const shopify = shopifyApp({
       lineItems: [
         {
           interval: BillingInterval.Every30Days,
-          amount: 399,
+          amount: 99.99,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.SCALE_YEARLY]: {
@@ -107,6 +123,7 @@ const shopify = shopifyApp({
           amount: 3999,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.PRO_MONTHLY]: {
@@ -114,9 +131,10 @@ const shopify = shopifyApp({
       lineItems: [
         {
           interval: BillingInterval.Every30Days,
-          amount: 599,
+          amount: 199.99,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
     [BILLING_PLANS.PRO_YEARLY]: {
@@ -127,6 +145,7 @@ const shopify = shopifyApp({
           amount: 6000,
           currencyCode: "USD",
         },
+        addressValidationUsageLine,
       ],
     },
   },

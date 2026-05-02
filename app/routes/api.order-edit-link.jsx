@@ -9,6 +9,7 @@ import {
   markEditSessionUsed,
   updateOrderDetails,
 } from "../services/orderflex-order.server";
+import {tryRecordAddressValidationAfterShippingSave} from "../services/address-validation-billing.server";
 
 async function adminGraphql(admin, query, variables = {}) {
   const response = await admin.graphql(query, {variables});
@@ -142,6 +143,11 @@ export const action = async ({request}) => {
         return toJson({ok: false, message: "Address line 1, city, and country code are required."});
       }
       await updateOrderDetails({admin, orderId: session.orderId, updates: {shippingAddress}});
+      await tryRecordAddressValidationAfterShippingSave(admin, {
+        settings,
+        orderId: session.orderId,
+        shippingAddress,
+      });
       return toJson({
         ok: true,
         message: "Shipping address updated.",

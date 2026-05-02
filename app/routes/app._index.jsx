@@ -115,8 +115,10 @@ export default function Index() {
 
       {visible.banner ? (
         <s-banner dismissible onDismiss={() => setVisible((v) => ({...v, banner: false}))} tone="info">
-          Orders are billed on usage tiers. Pick the plan that matches your monthly volume on{" "}
-          <s-link href="/app/pricing">Pricing</s-link>.
+          Choose a pricing tier by monthly order volume on{" "}
+          <s-link href="/app/pricing">Pricing</s-link>; optional address validation is usage-billed at the
+          published per-lookup rates. Customizing Shopify <strong>Checkout</strong> during checkout requires{" "}
+          <strong>Shopify Plus</strong>.
         </s-banner>
       ) : null}
 
