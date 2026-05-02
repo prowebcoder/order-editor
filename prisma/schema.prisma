@@ -45,6 +45,7 @@ model AppSettings {
   allowDiscountCodes   Boolean  @default(true)
   upsellProductIds     String   @default("[]")
   upsellCollectionIds  String   @default("[]")
+  checkoutMerchandisingJson String @default("{}")
   updatedAt            DateTime @updatedAt
   createdAt            DateTime @default(now())
 }

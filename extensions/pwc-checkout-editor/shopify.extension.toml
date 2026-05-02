@@ -45,33 +45,10 @@ network_access = true
 namespace = "$app"
 key = "requestedFreeGift"
 
+# Upsell products, titles, pricing, and images come from embedded app Settings (API), not checkout customize.
 [extensions.settings]
-[[extensions.settings.fields]]
-key = "upsell_variant_id"
-type = "variant_reference"
-name = "Upsell variant"
-description = "Pick any variant from the target product"
-
-[[extensions.settings.fields]]
-key = "upsell_title"
-type = "single_line_text_field"
-name = "Upsell title"
-description = "Title shown on the add-product card"
-
-[[extensions.settings.fields]]
-key = "upsell_price"
-type = "single_line_text_field"
-name = "Upsell price label"
-description = "Example: AUD $79.99"
-
-[[extensions.settings.fields]]
-key = "upsell_image_url"
-type = "single_line_text_field"
-name = "Upsell image URL"
-description = "Public image URL shown on the card and popup"
-
 [[extensions.settings.fields]]
 key = "portal_base_url"
 type = "single_line_text_field"
 name = "Order edit portal base URL"
-description = "Example: https://order-editor.vercel.app/order-edit"
+description = "Your app origin (same as embedded app URL), e.g. https://order-editor.vercel.app — loads upsells and order-edit from Settings."

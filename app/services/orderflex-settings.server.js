@@ -1,4 +1,5 @@
 import db from "../db.server";
+import {parseMerchandisingJson, sanitizeMerchandisingInput} from "./orderflex-merchandising.server";
 
 const DEFAULT_SETTINGS = {
   editWindowMinutes: 30,
@@ -39,6 +40,11 @@ export async function getSettings(shop) {
 
 export async function updateSettings(shop, payload) {
   const current = await getSettings(shop);
+  let nextMerchandisingJson;
+  if (payload.merchandising != null && typeof payload.merchandising === "object") {
+    nextMerchandisingJson = JSON.stringify(sanitizeMerchandisingInput(payload.merchandising));
+  }
+
   const merged = {
     ...current,
     ...payload,
@@ -64,6 +70,7 @@ export async function updateSettings(shop, payload) {
       enableUpsells: Boolean(merged.enableUpsells),
       allowDiscountCodes: Boolean(merged.allowDiscountCodes),
       upsellProductIds: JSON.stringify(merged.upsellProductIds),
+      checkoutMerchandisingJson: nextMerchandisingJson ?? "{}",
     },
     update: {
       editWindowMinutes: merged.editWindowMinutes,
@@ -72,6 +79,7 @@ export async function updateSettings(shop, payload) {
       enableUpsells: Boolean(merged.enableUpsells),
       allowDiscountCodes: Boolean(merged.allowDiscountCodes),
       upsellProductIds: JSON.stringify(merged.upsellProductIds),
+      ...(nextMerchandisingJson != null ? {checkoutMerchandisingJson: nextMerchandisingJson} : {}),
     },
   });
 
@@ -98,11 +106,13 @@ export async function updateSettings(shop, payload) {
 }
 
 function normalizeSettings(settings, collectionIds = [], checkoutOfferHeading = DEFAULT_SETTINGS.checkoutOfferHeading) {
+  const {checkoutMerchandisingJson: merchRaw, ...rest} = settings;
   return {
-    ...settings,
+    ...rest,
     upsellProductIds: safeJsonArray(settings.upsellProductIds),
     upsellCollectionIds: Array.isArray(collectionIds) ? collectionIds : [],
     checkoutOfferHeading: String(checkoutOfferHeading || DEFAULT_SETTINGS.checkoutOfferHeading),
+    merchandising: parseMerchandisingJson(merchRaw),
   };
 }
 

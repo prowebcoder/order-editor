@@ -144,7 +144,7 @@ function Extension() {
 
        
           <s-stack gap="base">
-            <s-heading>{offerHeading}</s-heading>
+            <s-heading >{offerHeading}</s-heading>
             {offersLoading ? <s-text tone="neutral">Loading products…</s-text> : null}
             {offersError ? <s-banner tone="warning">{offersError}</s-banner> : null}
             {!offersLoading && !offersError && !offersEnabled ? (

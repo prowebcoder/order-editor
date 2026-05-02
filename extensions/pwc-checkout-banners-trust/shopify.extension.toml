@@ -1,0 +1,28 @@
+# Banners + trust row: all copy and toggles are edited in the embedded app (Settings → Checkout display).
+# Customize only this block’s App public URL (same as Order Editor checkout block).
+api_version = "2026-01"
+
+[[extensions]]
+name = "pwc-checkout-banners-trust"
+handle = "pwc-checkout-banners-trust"
+type = "ui_extension"
+uid = "c7a4f901-2d8b-4e6c-a31f-9b0e5d4c3b2a"
+
+[[extensions.targeting]]
+module = "./src/CheckoutSurface.jsx"
+target = "purchase.checkout.block.render"
+
+[[extensions.targeting]]
+module = "./src/ThankYouSurface.jsx"
+target = "purchase.thank-you.block.render"
+
+[extensions.capabilities]
+network_access = true
+
+[extensions.settings]
+
+[[extensions.settings.fields]]
+key = "portal_base_url"
+type = "single_line_text_field"
+name = "App public URL"
+description = "Same as Order Editor: your live app URL (e.g. https://your-app.vercel.app). Loads banner & trust from Order Editor app Settings."
