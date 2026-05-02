@@ -6,7 +6,7 @@
 api_version = "2026-01"
 
 [[extensions]]
-name = "pwc-checkout-editor"
+name = "PWC : Order/Checkout Editor"
 handle = "pwc-checkout-editor"
 type = "ui_extension"
 uid = "0f5ab122-ebe7-20ea-6d07-53b1505ef94b153899f8"

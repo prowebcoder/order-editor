@@ -3,7 +3,7 @@
 api_version = "2026-01"
 
 [[extensions]]
-name = "pwc-checkout-banners-trust"
+name = "PWC : Checkout/Order Banners"
 handle = "pwc-checkout-banners-trust"
 type = "ui_extension"
 uid = "c7a4f901-2d8b-4e6c-a31f-9b0e5d4c3b2a"

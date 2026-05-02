@@ -6,7 +6,7 @@
 api_version = "2026-04"
 
 [[extensions]]
-name = "pwc-order-status-editor"
+name = "PWC : Order Status Editor"
 handle = "pwc-order-status-editor"
 type = "ui_extension"
 uid = "3b09f643-77e9-e93f-e77d-ef1ab2a44b06a98f4cc2"
