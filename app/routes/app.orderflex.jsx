@@ -1,5 +1,10 @@
 import {useEffect, useRef, useState} from "react";
 import {useFetcher, useLoaderData} from "react-router";
+import {
+  ORDER_EMAIL_NOTICE_BODY_KEY,
+  ORDER_EMAIL_NOTICE_LINK_KEY,
+  ORDER_EMAIL_NOTICE_NAMESPACE,
+} from "../constants/order-email-notice.js";
 import {authenticate} from "../shopify.server";
 import {CheckoutMerchandisingTab} from "../components/CheckoutMerchandisingTab.jsx";
 import {getSettings, updateSettings} from "../services/orderflex-settings.server";
@@ -45,8 +50,11 @@ export const loader = async ({request}) => {
     getAddressValidationUsageSummary(admin),
   ]);
 
+  const shopSlug = String(session.shop || "").replace(/\.myshopify\.com$/i, "");
+
   return {
     shop: session.shop,
+    notificationsSettingsUrl: shopSlug ? `https://admin.shopify.com/store/${shopSlug}/settings/notifications` : "",
     settings,
     products: products.products.nodes,
     collections: collections.collections.nodes,
@@ -102,6 +110,7 @@ export const action = async ({request}) => {
     allowProductEdit: String(form.get("allowProductEdit") || "") === "true",
     enableUpsells: String(form.get("enableUpsells") || "") === "true",
     allowDiscountCodes: String(form.get("allowDiscountCodes") || "") === "true",
+    includeShopifyEmailEditNotice: String(form.get("includeShopifyEmailEditNotice") || "") === "true",
     upsellProductIds,
     upsellCollectionIds,
     checkoutOfferHeading: String(form.get("checkoutOfferHeading") || "").trim() || currentSettings.checkoutOfferHeading,
@@ -132,8 +141,28 @@ function getFieldStringValue(event) {
   return String(t?.value ?? "");
 }
 
+const EMAIL_NOTICE_LIQUID_SNIPPET = `{% assign pwc_notice = order.metafields.${ORDER_EMAIL_NOTICE_NAMESPACE}.${ORDER_EMAIL_NOTICE_BODY_KEY} %}
+{% assign pwc_edit_link = order.metafields.${ORDER_EMAIL_NOTICE_NAMESPACE}.${ORDER_EMAIL_NOTICE_LINK_KEY} %}
+{% if pwc_notice != blank %}
+<p style="margin:16px 0;font-size:16px;line-height:1.45;">
+{{ pwc_notice.value | default: pwc_notice }}
+</p>
+{% endif %}
+{% if pwc_edit_link != blank %}
+<p style="margin:16px 0;">
+<a href="{{ pwc_edit_link.value | default: pwc_edit_link }}" style="color:#065f46;font-weight:600;text-decoration:none;">Edit your order</a>
+</p>
+{% endif %}`;
+
 export default function OrderFlexAdmin() {
-  const {shop, settings: loaderSettings, products, collections, addressValidationUsage} = useLoaderData();
+  const {
+    shop,
+    notificationsSettingsUrl,
+    settings: loaderSettings,
+    products,
+    collections,
+    addressValidationUsage,
+  } = useLoaderData();
   const fetcher = useFetcher();
   const merchFetcher = useFetcher();
   const saveAttemptRef = useRef(false);
@@ -145,6 +174,9 @@ export default function OrderFlexAdmin() {
   const [allowAddressEdit, setAllowAddressEdit] = useState(loaderSettings.allowAddressEdit);
   const [allowProductEdit, setAllowProductEdit] = useState(loaderSettings.allowProductEdit);
   const [allowDiscountCodes, setAllowDiscountCodes] = useState(loaderSettings.allowDiscountCodes);
+  const [includeShopifyEmailEditNotice, setIncludeShopifyEmailEditNotice] = useState(
+    Boolean(loaderSettings.includeShopifyEmailEditNotice),
+  );
   const [enableUpsells, setEnableUpsells] = useState(loaderSettings.enableUpsells);
   const [checkoutOfferHeading, setCheckoutOfferHeading] = useState(
     loaderSettings.checkoutOfferHeading || "Add the finishing touch",
@@ -182,6 +214,7 @@ export default function OrderFlexAdmin() {
     setAllowAddressEdit(!!s.allowAddressEdit);
     setAllowProductEdit(!!s.allowProductEdit);
     setAllowDiscountCodes(!!s.allowDiscountCodes);
+    setIncludeShopifyEmailEditNotice(!!s.includeShopifyEmailEditNotice);
     setEnableUpsells(!!s.enableUpsells);
     setCheckoutOfferHeading(s.checkoutOfferHeading || "");
     setSelectedProducts(pickInitialSelection(s.upsellProductIds || [], products));
@@ -236,6 +269,7 @@ export default function OrderFlexAdmin() {
     fd.append("allowAddressEdit", allowAddressEdit ? "true" : "false");
     fd.append("allowProductEdit", allowProductEdit ? "true" : "false");
     fd.append("allowDiscountCodes", allowDiscountCodes ? "true" : "false");
+    fd.append("includeShopifyEmailEditNotice", includeShopifyEmailEditNotice ? "true" : "false");
     fd.append("enableUpsells", enableUpsells ? "true" : "false");
     fd.append("checkoutOfferHeading", checkoutOfferHeading || "");
     fd.append(
@@ -410,6 +444,31 @@ export default function OrderFlexAdmin() {
                 setEditWindowMinutes(Math.min(240, Math.max(1, n)));
               }}
             />
+
+            <s-stack direction="block" gap="small-400">
+              <s-switch
+                label="Include order-edit notice for Shopify emails (advanced)"
+                details="When on, each new order gets metafields the email can read. Copy the Liquid from this page’s Instructions tab → “Order confirmation email (optional)” and paste into Shopify Admin → Settings → Notifications → Order confirmation."
+                checked={includeShopifyEmailEditNotice}
+                onChange={(e) => setIncludeShopifyEmailEditNotice(getCheckboxLikeValue(e))}
+              />
+
+              <s-banner tone={includeShopifyEmailEditNotice ? "info" : "warning"}>
+                <s-stack direction="block" gap="small-200">
+                  <s-text variant="bodySm">
+                    The actual Liquid snippet lives in the <s-text variant="bodySm" fontWeight="semibold">Instructions</s-text>{" "}
+                    tab below (section “Order confirmation email”). Shopify may send Order confirmation slightly before webhooks
+                    arrive, so rarely the first email can omit this block. We only populate metafields (
+                    <s-text variant="bodySm" fontWeight="semibold">{ORDER_EMAIL_NOTICE_NAMESPACE}</s-text>).
+                  </s-text>
+                  {notificationsSettingsUrl ? (
+                    <s-button variant="secondary" href={notificationsSettingsUrl} target="_blank">
+                      Open notification settings in Shopify Admin
+                    </s-button>
+                  ) : null}
+                </s-stack>
+              </s-banner>
+            </s-stack>
 
             <s-stack direction="block" gap="small-200">
               <s-switch
@@ -594,6 +653,36 @@ export default function OrderFlexAdmin() {
               <s-list-item>For banners & trust, use the Checkout display tab here and only set App public URL on that block.</s-list-item>
               <s-list-item>After changes, publish the theme and run one test checkout + edit.</s-list-item>
             </s-unordered-list>
+
+            <s-divider />
+
+            <s-grid gap="small-200">
+              <s-heading>Order confirmation email (optional)</s-heading>
+              <s-paragraph color="subdued" variant="bodySm">
+                Turn on{' '}
+                <s-text fontWeight="semibold" variant="bodySm">
+                  Include order-edit notice for Shopify emails
+                </s-text>{' '}
+                under General above. Place an order notification test checkout, open the rendered order from Admin, verify
+                metafields {ORDER_EMAIL_NOTICE_NAMESPACE}.{ORDER_EMAIL_NOTICE_BODY_KEY} / {ORDER_EMAIL_NOTICE_LINK_KEY} exist,
+                then add this Liquid to <s-text variant="bodySm">Order confirmation</s-text> template (preferably near the top
+                of the body message).
+              </s-paragraph>
+            </s-grid>
+            <s-box padding="small" background="base" border="base" borderRadius="base" overflow="auto">
+              <pre
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                }}
+              >
+                {EMAIL_NOTICE_LIQUID_SNIPPET}
+              </pre>
+            </s-box>
 
             <s-box padding="base" background="subdued" borderRadius="base">
               <s-text variant="bodySm" tone="subdued">

@@ -7,6 +7,7 @@ export const DEFAULT_MERCHANDISING = {
     bannerCustomText: "",
     bannerPromoText: "",
     bannerImageUrl: "",
+    bannerImageMaxHeightPx: 0,
     editWindowOverrideMinutes: 0,
   },
   thankyou: {
@@ -18,15 +19,17 @@ export const DEFAULT_MERCHANDISING = {
     bannerCustomText: "",
     bannerPromoText: "",
     bannerImageUrl: "",
+    bannerImageMaxHeightPx: 0,
     editWindowOverrideMinutes: 0,
   },
   trust: {
     showRow: false,
-    showPaymentLabels: true,
     secureCheckoutText: "Secure checkout — SSL encrypted",
+    secureCheckoutTextAlign: "start",
     returnPolicyText: "",
     partnerDisclaimerText: "",
     rowImageUrl: "",
+    rowImageMaxHeightPx: 0,
   },
 };
 
@@ -56,36 +59,56 @@ export function sanitizeMerchandisingInput(input) {
     const n = Number(v);
     return Number.isFinite(n) ? Math.trunc(n) : d;
   };
-  const bool = (v) => v === true || v === "true";
+  /** @param {unknown} v @param {boolean} whenUnset when field is absent or ambiguous string */
+  const toggle = (v, whenUnset) => {
+    if (v === undefined || v === null) return whenUnset;
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (typeof v === "string") {
+      const t = v.trim().toLowerCase();
+      if (["false", "0", "off", "no", ""].includes(t)) return false;
+      if (["true", "1", "on", "yes"].includes(t)) return true;
+      return whenUnset;
+    }
+    return Boolean(v);
+  };
   const str = (v) => String(v ?? "").trim();
+  const crossAlign = (v) => {
+    const x = str(v).toLowerCase();
+    if (x === "center" || x === "end") return x;
+    return "start";
+  };
 
   return {
     checkout: {
-      showBanner: bool(m.checkout.showBanner),
+      showBanner: toggle(m.checkout.showBanner, true),
       bannerMode: str(m.checkout.bannerMode || "editable_until").toLowerCase() || "editable_until",
       bannerCustomText: str(m.checkout.bannerCustomText),
       bannerPromoText: str(m.checkout.bannerPromoText),
       bannerImageUrl: str(m.checkout.bannerImageUrl),
+      bannerImageMaxHeightPx: Math.min(600, Math.max(0, num(m.checkout.bannerImageMaxHeightPx, 0))),
       editWindowOverrideMinutes: Math.min(240, Math.max(0, num(m.checkout.editWindowOverrideMinutes, 0))),
     },
     thankyou: {
-      showExclusiveHeader: bool(m.thankyou.showExclusiveHeader),
+      showExclusiveHeader: toggle(m.thankyou.showExclusiveHeader, false),
       exclusiveHeadline: str(m.thankyou.exclusiveHeadline),
       exclusiveSubtext: str(m.thankyou.exclusiveSubtext),
-      showBanner: bool(m.thankyou.showBanner),
+      showBanner: toggle(m.thankyou.showBanner, true),
       bannerMode: str(m.thankyou.bannerMode || "editable_until").toLowerCase() || "editable_until",
       bannerCustomText: str(m.thankyou.bannerCustomText),
       bannerPromoText: str(m.thankyou.bannerPromoText),
       bannerImageUrl: str(m.thankyou.bannerImageUrl),
+      bannerImageMaxHeightPx: Math.min(600, Math.max(0, num(m.thankyou.bannerImageMaxHeightPx, 0))),
       editWindowOverrideMinutes: Math.min(240, Math.max(0, num(m.thankyou.editWindowOverrideMinutes, 0))),
     },
     trust: {
-      showRow: bool(m.trust.showRow),
-      showPaymentLabels: bool(m.trust.showPaymentLabels),
+      showRow: toggle(m.trust.showRow, false),
       secureCheckoutText: str(m.trust.secureCheckoutText),
+      secureCheckoutTextAlign: crossAlign(m.trust.secureCheckoutTextAlign),
       returnPolicyText: str(m.trust.returnPolicyText),
       partnerDisclaimerText: str(m.trust.partnerDisclaimerText),
       rowImageUrl: str(m.trust.rowImageUrl),
+      rowImageMaxHeightPx: Math.min(600, Math.max(0, num(m.trust.rowImageMaxHeightPx, 0))),
     },
   };
 }

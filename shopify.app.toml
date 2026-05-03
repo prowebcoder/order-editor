@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "467a35771c52d0c84cbe8c225fbb9da8"
-name = "PWC : Order Editor"
+name = "PWC : Order & Checkout Editor"
 application_url = "https://order-editor.vercel.app"
 embedded = true
 
@@ -18,6 +18,10 @@ api_version = "2026-04"
   [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
 
 [access_scopes]
 # Keep in sync with `resolveScopes()` in app/shopify.server.js (`fileCreate` needs write_files).

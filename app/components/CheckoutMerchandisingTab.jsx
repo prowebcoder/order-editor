@@ -55,6 +55,17 @@ export function CheckoutMerchandisingTab({merch, patchMerch, disabled}) {
             urlKey="bannerImageUrl"
           />
           <s-number-field
+            label="Checkout banner image max height (px)"
+            value={String(Number(co.bannerImageMaxHeightPx ?? 0) || 0)}
+            min={0}
+            max={600}
+            disabled={disabled}
+            details="0 = no limit. Caps tall hero images in the order summary (same logic as trust badge)."
+            onInput={(e) =>
+              patchMerch("checkout", "bannerImageMaxHeightPx", Number.parseInt(e?.currentTarget?.value || "0", 10) || 0)
+            }
+          />
+          <s-number-field
             label="Edit-window override (minutes)"
             value={String(co.editWindowOverrideMinutes ?? 0)}
             min={0}
@@ -128,6 +139,17 @@ export function CheckoutMerchandisingTab({merch, patchMerch, disabled}) {
             urlKey="bannerImageUrl"
           />
           <s-number-field
+            label="Thank-you banner image max height (px)"
+            value={String(Number(ty.bannerImageMaxHeightPx ?? 0) || 0)}
+            min={0}
+            max={600}
+            disabled={disabled}
+            details="0 = no limit."
+            onInput={(e) =>
+              patchMerch("thankyou", "bannerImageMaxHeightPx", Number.parseInt(e?.currentTarget?.value || "0", 10) || 0)
+            }
+          />
+          <s-number-field
             label="Thank-you edit-window override (minutes)"
             value={String(ty.editWindowOverrideMinutes ?? 0)}
             min={0}
@@ -148,14 +170,26 @@ export function CheckoutMerchandisingTab({merch, patchMerch, disabled}) {
             label="Show trust row"
             checked={!!trust.showRow}
             disabled={disabled}
+            details="Includes badge image URL, secure line, returns/partner snippets, and banners. Off = none of these publish."
             onChange={(e) => patchMerch("trust", "showRow", e?.currentTarget?.checked ?? e?.detail?.checked ?? false)}
           />
-          <s-switch
-            label="Show payment method labels (display text)"
-            checked={!!trust.showPaymentLabels}
+          {!!String(trust.rowImageUrl || "").trim() && !trust.showRow ? (
+            <s-banner tone="warning">
+              <s-text variant="bodySm">
+                Trust row is off — the badge image and trust copy will not appear on checkout until you turn on Show trust
+                row and save.
+              </s-text>
+            </s-banner>
+          ) : null}
+          <s-number-field
+            label="Trust badge image max height (px)"
+            value={String(Number(trust.rowImageMaxHeightPx ?? 0) || 0)}
+            min={0}
+            max={600}
             disabled={disabled}
-            onChange={(e) =>
-              patchMerch("trust", "showPaymentLabels", e?.currentTarget?.checked ?? e?.detail?.checked ?? false)
+            details="0 = no limit (full natural height). Use this to shorten tall badge strips in checkout."
+            onInput={(e) =>
+              patchMerch("trust", "rowImageMaxHeightPx", Number.parseInt(e?.currentTarget?.value || "0", 10) || 0)
             }
           />
           <s-text-field
@@ -163,6 +197,13 @@ export function CheckoutMerchandisingTab({merch, patchMerch, disabled}) {
             value={String(trust.secureCheckoutText || "")}
             disabled={disabled}
             onInput={(e) => patchMerch("trust", "secureCheckoutText", e?.currentTarget?.value ?? "")}
+          />
+          <s-text-field
+            label="Secure checkout text alignment"
+            value={String(trust.secureCheckoutTextAlign || "start")}
+            disabled={disabled}
+            details="start | center | end"
+            onInput={(e) => patchMerch("trust", "secureCheckoutTextAlign", e?.currentTarget?.value ?? "start")}
           />
           <s-text-area
             label="Returns / policy snippet"
