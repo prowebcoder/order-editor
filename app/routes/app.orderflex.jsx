@@ -1,10 +1,5 @@
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useFetcher, useLoaderData} from "react-router";
-import {
-  ORDER_EMAIL_NOTICE_BODY_KEY,
-  ORDER_EMAIL_NOTICE_LINK_KEY,
-  ORDER_EMAIL_NOTICE_NAMESPACE,
-} from "../constants/order-email-notice.js";
 import {authenticate} from "../shopify.server";
 import {CheckoutMerchandisingTab} from "../components/CheckoutMerchandisingTab.jsx";
 import {getSettings, updateSettings} from "../services/orderflex-settings.server";
@@ -110,7 +105,6 @@ export const action = async ({request}) => {
     allowProductEdit: String(form.get("allowProductEdit") || "") === "true",
     enableUpsells: String(form.get("enableUpsells") || "") === "true",
     allowDiscountCodes: String(form.get("allowDiscountCodes") || "") === "true",
-    includeShopifyEmailEditNotice: String(form.get("includeShopifyEmailEditNotice") || "") === "true",
     upsellProductIds,
     upsellCollectionIds,
     checkoutOfferHeading: String(form.get("checkoutOfferHeading") || "").trim() || currentSettings.checkoutOfferHeading,
@@ -141,18 +135,15 @@ function getFieldStringValue(event) {
   return String(t?.value ?? "");
 }
 
-const EMAIL_NOTICE_LIQUID_SNIPPET = `{% assign pwc_notice = order.metafields.${ORDER_EMAIL_NOTICE_NAMESPACE}.${ORDER_EMAIL_NOTICE_BODY_KEY} %}
-{% assign pwc_edit_link = order.metafields.${ORDER_EMAIL_NOTICE_NAMESPACE}.${ORDER_EMAIL_NOTICE_LINK_KEY} %}
-{% if pwc_notice != blank %}
+/** Shopify Order confirmation: only `{{ order_name }}` is dynamic; minutes match “Edit window duration” when you copy from Instructions. */
+function buildOrderConfirmationEmailSnippet(editWindowMins) {
+  const n = Math.max(1, Math.min(240, Math.floor(Number(editWindowMins) || 1)));
+  const unit = n === 1 ? "minute" : "minutes";
+  return `{% comment %} PWC Order Editor — paste directly under <p>{{ email_body }}</p> in Shopify Admin → Settings → Notifications → Order confirmation. Re-copy from OrderFlex → Instructions after you change “Edit window duration” (this block uses ${n} ${unit}). {% endcomment %}
 <p style="margin:16px 0;font-size:16px;line-height:1.45;">
-{{ pwc_notice.value | default: pwc_notice }}
-</p>
-{% endif %}
-{% if pwc_edit_link != blank %}
-<p style="margin:16px 0;">
-<a href="{{ pwc_edit_link.value | default: pwc_edit_link }}" style="color:#065f46;font-weight:600;text-decoration:none;">Edit your order</a>
-</p>
-{% endif %}`;
+You have ${n} ${unit} from when this order was placed to make eligible changes for {{ order_name }}.
+</p>`;
+}
 
 export default function OrderFlexAdmin() {
   const {
@@ -174,9 +165,6 @@ export default function OrderFlexAdmin() {
   const [allowAddressEdit, setAllowAddressEdit] = useState(loaderSettings.allowAddressEdit);
   const [allowProductEdit, setAllowProductEdit] = useState(loaderSettings.allowProductEdit);
   const [allowDiscountCodes, setAllowDiscountCodes] = useState(loaderSettings.allowDiscountCodes);
-  const [includeShopifyEmailEditNotice, setIncludeShopifyEmailEditNotice] = useState(
-    Boolean(loaderSettings.includeShopifyEmailEditNotice),
-  );
   const [enableUpsells, setEnableUpsells] = useState(loaderSettings.enableUpsells);
   const [checkoutOfferHeading, setCheckoutOfferHeading] = useState(
     loaderSettings.checkoutOfferHeading || "Add the finishing touch",
@@ -199,6 +187,11 @@ export default function OrderFlexAdmin() {
   const busy =
     submitting || merchSubmitting || fetcher.state === "loading" || merchFetcher.state === "loading";
 
+  const orderConfirmationEmailSnippet = useMemo(
+    () => buildOrderConfirmationEmailSnippet(editWindowMinutes),
+    [editWindowMinutes],
+  );
+
   function patchMerch(section, key, value) {
     setMerch((m) => ({
       ...m,
@@ -214,7 +207,6 @@ export default function OrderFlexAdmin() {
     setAllowAddressEdit(!!s.allowAddressEdit);
     setAllowProductEdit(!!s.allowProductEdit);
     setAllowDiscountCodes(!!s.allowDiscountCodes);
-    setIncludeShopifyEmailEditNotice(!!s.includeShopifyEmailEditNotice);
     setEnableUpsells(!!s.enableUpsells);
     setCheckoutOfferHeading(s.checkoutOfferHeading || "");
     setSelectedProducts(pickInitialSelection(s.upsellProductIds || [], products));
@@ -269,7 +261,6 @@ export default function OrderFlexAdmin() {
     fd.append("allowAddressEdit", allowAddressEdit ? "true" : "false");
     fd.append("allowProductEdit", allowProductEdit ? "true" : "false");
     fd.append("allowDiscountCodes", allowDiscountCodes ? "true" : "false");
-    fd.append("includeShopifyEmailEditNotice", includeShopifyEmailEditNotice ? "true" : "false");
     fd.append("enableUpsells", enableUpsells ? "true" : "false");
     fd.append("checkoutOfferHeading", checkoutOfferHeading || "");
     fd.append(
@@ -445,30 +436,17 @@ export default function OrderFlexAdmin() {
               }}
             />
 
-            <s-stack direction="block" gap="small-400">
-              <s-switch
-                label="Include order-edit notice for Shopify emails (advanced)"
-                details="When on, each new order gets metafields the email can read. Copy the Liquid from this page’s Instructions tab → “Order confirmation email (optional)” and paste into Shopify Admin → Settings → Notifications → Order confirmation."
-                checked={includeShopifyEmailEditNotice}
-                onChange={(e) => setIncludeShopifyEmailEditNotice(getCheckboxLikeValue(e))}
-              />
-
-              <s-banner tone={includeShopifyEmailEditNotice ? "info" : "warning"}>
-                <s-stack direction="block" gap="small-200">
-                  <s-text variant="bodySm">
-                    The actual Liquid snippet lives in the <s-text variant="bodySm" fontWeight="semibold">Instructions</s-text>{" "}
-                    tab below (section “Order confirmation email”). Shopify may send Order confirmation slightly before webhooks
-                    arrive, so rarely the first email can omit this block. We only populate metafields (
-                    <s-text variant="bodySm" fontWeight="semibold">{ORDER_EMAIL_NOTICE_NAMESPACE}</s-text>).
-                  </s-text>
-                  {notificationsSettingsUrl ? (
-                    <s-button variant="secondary" href={notificationsSettingsUrl} target="_blank">
-                      Open notification settings in Shopify Admin
-                    </s-button>
-                  ) : null}
-                </s-stack>
-              </s-banner>
-            </s-stack>
+            <s-text variant="bodySm" tone="subdued">
+              Optional order confirmation copy (no metafields): see the <s-text fontWeight="semibold">Instructions</s-text> tab.
+              {notificationsSettingsUrl ? (
+                <>
+                  {" "}
+                  <s-link href={notificationsSettingsUrl} target="_blank">
+                    Open notification settings
+                  </s-link>
+                </>
+              ) : null}
+            </s-text>
 
             <s-stack direction="block" gap="small-200">
               <s-switch
@@ -659,14 +637,11 @@ export default function OrderFlexAdmin() {
             <s-grid gap="small-200">
               <s-heading>Order confirmation email (optional)</s-heading>
               <s-paragraph color="subdued" variant="bodySm">
-                Turn on{' '}
-                <s-text fontWeight="semibold" variant="bodySm">
-                  Include order-edit notice for Shopify emails
-                </s-text>{' '}
-                under General above. Place an order notification test checkout, open the rendered order from Admin, verify
-                metafields {ORDER_EMAIL_NOTICE_NAMESPACE}.{ORDER_EMAIL_NOTICE_BODY_KEY} / {ORDER_EMAIL_NOTICE_LINK_KEY} exist,
-                then add this Liquid to <s-text variant="bodySm">Order confirmation</s-text> template (preferably near the top
-                of the body message).
+                Copy the snippet below into Shopify Admin → Settings → Notifications → <s-text fontWeight="semibold">Order confirmation</s-text>.
+                Search for <s-text fontWeight="semibold">{'{{ email_body }}'}</s-text> and paste the block <s-text fontWeight="semibold">directly under</s-text>{' '}
+                <s-text fontWeight="semibold">{'<p>{{ email_body }}</p>'}</s-text>. The minute count is baked in from{' '}
+                <s-text fontWeight="semibold">Edit window duration</s-text> on the General tab — after you change it, save settings and copy again.
+                Only <s-text fontWeight="semibold">{'{{ order_name }}'}</s-text> is resolved by Shopify when the email sends.
               </s-paragraph>
             </s-grid>
             <s-box padding="small" background="base" border="base" borderRadius="base" overflow="auto">
@@ -680,7 +655,7 @@ export default function OrderFlexAdmin() {
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                 }}
               >
-                {EMAIL_NOTICE_LIQUID_SNIPPET}
+                {orderConfirmationEmailSnippet}
               </pre>
             </s-box>
 

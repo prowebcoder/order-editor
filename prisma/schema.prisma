@@ -42,8 +42,6 @@ model AppSettings {
   allowProductEdit     Boolean  @default(true)
   enableUpsells        Boolean  @default(true)
   codVerification      Boolean  @default(false)
-  /** When enabled, writes order metafields for Shopify “Order confirmation” Liquid (merchant pastes snippet once). */
-  includeShopifyEmailEditNotice Boolean  @default(false)
   allowDiscountCodes   Boolean  @default(true)
   upsellProductIds     String   @default("[]")
   upsellCollectionIds  String   @default("[]")

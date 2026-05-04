@@ -3,7 +3,6 @@ import {parseMerchandisingJson, sanitizeMerchandisingInput} from "./orderflex-me
 
 const DEFAULT_SETTINGS = {
   editWindowMinutes: 30,
-  includeShopifyEmailEditNotice: false,
   allowAddressEdit: true,
   allowProductEdit: true,
   enableUpsells: true,
@@ -20,7 +19,6 @@ export async function getSettings(shop) {
       data: {
         shop,
         editWindowMinutes: DEFAULT_SETTINGS.editWindowMinutes,
-        includeShopifyEmailEditNotice: DEFAULT_SETTINGS.includeShopifyEmailEditNotice,
         allowAddressEdit: DEFAULT_SETTINGS.allowAddressEdit,
         allowProductEdit: DEFAULT_SETTINGS.allowProductEdit,
         enableUpsells: DEFAULT_SETTINGS.enableUpsells,
@@ -60,10 +58,6 @@ export async function updateSettings(shop, payload) {
     checkoutOfferHeading: String(
       payload.checkoutOfferHeading ?? current.checkoutOfferHeading ?? DEFAULT_SETTINGS.checkoutOfferHeading,
     ).trim() || DEFAULT_SETTINGS.checkoutOfferHeading,
-    includeShopifyEmailEditNotice:
-      typeof payload.includeShopifyEmailEditNotice === "boolean"
-        ? payload.includeShopifyEmailEditNotice
-        : Boolean(current.includeShopifyEmailEditNotice),
   };
 
   const updated = await db.appSettings.upsert({
@@ -71,7 +65,6 @@ export async function updateSettings(shop, payload) {
     create: {
       shop,
       editWindowMinutes: merged.editWindowMinutes,
-      includeShopifyEmailEditNotice: Boolean(merged.includeShopifyEmailEditNotice),
       allowAddressEdit: Boolean(merged.allowAddressEdit),
       allowProductEdit: Boolean(merged.allowProductEdit),
       enableUpsells: Boolean(merged.enableUpsells),
@@ -81,7 +74,6 @@ export async function updateSettings(shop, payload) {
     },
     update: {
       editWindowMinutes: merged.editWindowMinutes,
-      includeShopifyEmailEditNotice: Boolean(merged.includeShopifyEmailEditNotice),
       allowAddressEdit: Boolean(merged.allowAddressEdit),
       allowProductEdit: Boolean(merged.allowProductEdit),
       enableUpsells: Boolean(merged.enableUpsells),

@@ -19,10 +19,6 @@ api_version = "2026-04"
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 
-  [[webhooks.subscriptions]]
-  topics = [ "orders/create" ]
-  uri = "/webhooks/orders/create"
-
 [access_scopes]
 # Keep in sync with `resolveScopes()` in app/shopify.server.js (`fileCreate` needs write_files).
 scopes = "read_files,write_files,write_products,read_orders,write_orders,read_customers,write_order_edits"
