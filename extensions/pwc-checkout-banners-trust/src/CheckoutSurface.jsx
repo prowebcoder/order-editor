@@ -82,9 +82,9 @@ function CheckoutChrome() {
   }
 
   return (
-    <s-stack gap="small" inlineSize="fill">
+    <s-stack gap="base" inlineSize="fill">
       {hasBanner ? (
-        <s-stack gap="small" inlineSize="fill">
+        <s-stack gap="base" inlineSize="fill">
           {bannerImageSrc ? (
             <s-box
               background="subdued"
@@ -106,23 +106,26 @@ function CheckoutChrome() {
             </s-box>
           ) : null}
           <s-banner tone="info">
-            {/\r?\n/.test(body) ? (
-              <s-stack gap="extra-tight">
-                {body.split(/\r?\n/).map((line, i) =>
-                  line.trim() ? (
-                    <s-text key={i}>{line}</s-text>
-                  ) : null,
-                )}
-              </s-stack>
-            ) : (
-              <s-text>{body}</s-text>
-            )}
+            <s-stack direction="inline" gap="base" alignItems="start">
+              <s-icon type="info" size="base" tone="info" />
+              {/\r?\n/.test(body) ? (
+                <s-stack gap="small">
+                  {body.split(/\r?\n/).map((line, i) =>
+                    line.trim() ? (
+                      <s-text key={i}>{line}</s-text>
+                    ) : null,
+                  )}
+                </s-stack>
+              ) : (
+                <s-text>{body}</s-text>
+              )}
+            </s-stack>
           </s-banner>
         </s-stack>
       ) : null}
 
       {hasTrust ? (
-        <s-stack gap="small" inlineSize="fill">
+        <s-stack gap="base" inlineSize="fill">
           {showTrustBadge ? (
             <s-box
               background="subdued"

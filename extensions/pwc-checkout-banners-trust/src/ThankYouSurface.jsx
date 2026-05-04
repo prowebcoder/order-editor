@@ -88,10 +88,15 @@ function ThankYouChrome() {
   }
 
   return (
-    <s-stack gap="small" inlineSize="fill">
+    <s-stack gap="base" inlineSize="fill">
       {hasExclusive ? (
-        <s-stack gap="small-100">
-          {exclusiveHeadline ? <s-heading>{exclusiveHeadline}</s-heading> : null}
+        <s-stack gap="small">
+          {exclusiveHeadline ? (
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <s-icon type="check-circle" size="base" tone="success" />
+              <s-heading>{exclusiveHeadline}</s-heading>
+            </s-stack>
+          ) : null}
           {exclusiveSub ? (
             <s-stack gap="extra-tight">
               {exclusiveSub.split(/\r?\n/).map((line, i) =>
@@ -107,7 +112,7 @@ function ThankYouChrome() {
       ) : null}
 
       {hasBanner ? (
-        <s-stack gap="small" inlineSize="fill">
+        <s-stack gap="base" inlineSize="fill">
           {bannerImageSrc ? (
             <s-box
               background="subdued"
@@ -129,23 +134,30 @@ function ThankYouChrome() {
             </s-box>
           ) : null}
           <s-banner tone={mode === 'promo' || mode === 'editable_until' ? 'success' : 'info'}>
-            {/\r?\n/.test(body) ? (
-              <s-stack gap="extra-tight">
-                {body.split(/\r?\n/).map((line, i) =>
-                  line.trim() ? (
-                    <s-text key={i}>{line}</s-text>
-                  ) : null,
-                )}
-              </s-stack>
-            ) : (
-              <s-text>{body}</s-text>
-            )}
+            <s-stack direction="inline" gap="base" alignItems="start">
+              <s-icon
+                type={mode === 'promo' || mode === 'editable_until' ? 'check-circle' : 'info'}
+                size="base"
+                tone={mode === 'promo' || mode === 'editable_until' ? 'success' : 'info'}
+              />
+              {/\r?\n/.test(body) ? (
+                <s-stack gap="small">
+                  {body.split(/\r?\n/).map((line, i) =>
+                    line.trim() ? (
+                      <s-text key={i}>{line}</s-text>
+                    ) : null,
+                  )}
+                </s-stack>
+              ) : (
+                <s-text>{body}</s-text>
+              )}
+            </s-stack>
           </s-banner>
         </s-stack>
       ) : null}
 
       {hasTrust ? (
-        <s-stack gap="small" inlineSize="fill">
+        <s-stack gap="base" inlineSize="fill">
           {showTrustBadge ? (
             <s-box
               background="subdued"

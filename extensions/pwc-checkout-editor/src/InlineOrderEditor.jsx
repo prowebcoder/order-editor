@@ -4,6 +4,60 @@ import {useEffect, useMemo, useState} from "preact/hooks";
 
 const NO_UPSELL_VARIANT = "__orderflex_no_upsell__";
 
+/**
+ * Accordion header uses `s-clickable` (not `s-button variant="auto"`): auto buttons render as
+ * link-style (blue) and shrink to content. `s-details`/`s-summary` + nested stacks breaks the
+ * native disclosure caret on customer account — we keep explicit chevrons here.
+ */
+// eslint-disable-next-line react/prop-types -- internal wrapper; call sites pass static props
+function EditAccordion({icon, title, children}) {
+  const [open, setOpen] = useState(false);
+  const a11yLabel = open ? `Collapse ${title}` : `Expand ${title}`;
+
+  return (
+    <s-box border="base" borderRadius="base" overflow="hidden" padding="none" background="base" minInlineSize="100%">
+      <s-stack gap="none" direction="block" minInlineSize="100%">
+        <s-clickable
+          type="button"
+          accessibilityLabel={a11yLabel}
+          background="base"
+          border="none"
+          paddingBlock="small"
+          paddingInline="base"
+          minInlineSize="100%"
+          inlineSize="100%"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <s-stack
+            direction="inline"
+            gap="base"
+            alignItems="center"
+            justifyContent="space-between"
+            minInlineSize="100%"
+            inlineSize="100%"
+          >
+            <s-stack direction="inline" gap="base" alignItems="center" minInlineSize="0">
+              <s-icon type={icon} size="base" tone="neutral" />
+              <s-text tone="auto">{title}</s-text>
+            </s-stack>
+            <s-icon type={open ? "chevron-up" : "chevron-down"} size="base" tone="neutral" />
+          </s-stack>
+        </s-clickable>
+        {open ? (
+          <s-stack gap="none" direction="block" minInlineSize="100%">
+            <s-divider direction="inline" />
+            <s-box padding="base" background="subdued">
+              <s-stack gap="large" direction="block">
+                {children}
+              </s-stack>
+            </s-box>
+          </s-stack>
+        ) : null}
+      </s-stack>
+    </s-box>
+  );
+}
+
 export function InlineOrderEditor() {
   /** Thank-you + account surfaces populate orderConfirmation / shop asynchronously — subscribe instead of one-off reads. */
   const [resolvedOrderId, setResolvedOrderId] = useState("");
@@ -35,7 +89,8 @@ export function InlineOrderEditor() {
   }, []);
 
   const waitingForContext = !(resolvedShopDomain && resolvedOrderId);
-  const g = typeof globalThis !== "undefined" ? globalThis : self;
+  /** Extension global (timers); avoids `globalThis` for eslint `no-undef` in this target. */
+  const g = self;
 
   useEffect(() => {
     async function loadState() {
@@ -209,10 +264,12 @@ export function InlineOrderEditor() {
   ).padStart(2, "0")}`;
 
   return (
-  
     <s-section>
-      <s-stack gap="base">
-        <s-heading>Edit your order</s-heading>
+      <s-stack gap="large" minInlineSize="100%" inlineSize="100%">
+        <s-stack direction="inline" gap="base" alignItems="center">
+          <s-icon type="edit" size="base" tone="neutral" />
+          <s-heading>Edit your order</s-heading>
+        </s-stack>
         {waitingForContext ? (
           <s-banner tone="info">Connecting your order…</s-banner>
         ) : null}
@@ -223,42 +280,39 @@ export function InlineOrderEditor() {
           <s-banner tone={state.ok ? "success" : "warning"}>{state.message}</s-banner>
         ) : null}
         {!waitingForContext && !state.loading && state.ok ? (
-          <s-stack gap="base">
+          <s-stack gap="large">
             <s-text type="small">
               {secondsLeft > 0 ? `Time left to edit: ${countdown}` : "Edit window expired."}
             </s-text>
 
-            <s-box border="base" borderRadius="base" padding="base">
-              <s-details>
-                <s-summary>Change contact information</s-summary>
-              <s-stack gap="small">
-                <s-text-field
-                  label="Contact email"
-                  value={state.order?.customerEmail || ""}
-                  onChange={(event) =>
-                    setState((prev) => ({...prev, order: {...prev.order, customerEmail: event.currentTarget.value}}))
-                  }
-                />
-                {state.order?.customerFirstName || state.order?.customerLastName ? (
-                  <s-text type="small">
-                    Name on account: {[state.order?.customerFirstName, state.order?.customerLastName].filter(Boolean).join(" ")}
-                  </s-text>
-                ) : null}
-                <s-button onClick={() => mutate("update-contact", {contactEmail: state.order?.customerEmail || ""})}>
-                  Save contact
-                </s-button>
-              </s-stack>
-              </s-details>
-            </s-box>
+            <EditAccordion icon="email" title="Change contact information">
+              <s-text-field
+                label="Contact email"
+                value={state.order?.customerEmail || ""}
+                onChange={(event) =>
+                  setState((prev) => ({...prev, order: {...prev.order, customerEmail: event.currentTarget.value}}))
+                }
+              />
+              {state.order?.customerFirstName || state.order?.customerLastName ? (
+                <s-text type="small" tone="neutral">
+                  Name on account: {[state.order?.customerFirstName, state.order?.customerLastName].filter(Boolean).join(" ")}
+                </s-text>
+              ) : null}
+              <s-button
+                variant="secondary"
+                onClick={() => mutate("update-contact", {contactEmail: state.order?.customerEmail || ""})}
+              >
+                Save contact
+              </s-button>
+            </EditAccordion>
 
             {state.settings?.allowAddressEdit ? (
-              <s-box border="base" borderRadius="base" padding="base">
-                <s-details>
-                  <s-summary>Edit shipping address</s-summary>
-                <s-stack gap="small">
-                <s-text type="small">Include full name, state / province code, and ZIP (required by Shopify).</s-text>
+              <EditAccordion icon="truck" title="Edit shipping address">
+                <s-text type="small" tone="neutral">
+                  Include full name, state / province code, and ZIP (required by Shopify).
+                </s-text>
 
-                <s-stack direction="inline" gap="small">
+                <s-stack direction="inline" gap="base">
                   <s-text-field
                     label="First name"
                     value={state.order?.shippingAddress?.firstName ?? ""}
@@ -326,7 +380,7 @@ export function InlineOrderEditor() {
                   }
                 />
 
-                <s-stack direction="inline" gap="small">
+                <s-stack direction="inline" gap="base">
                   <s-text-field
                     label="City"
                     value={state.order?.shippingAddress?.city ?? ""}
@@ -362,7 +416,7 @@ export function InlineOrderEditor() {
                   />
                 </s-stack>
 
-                <s-stack direction="inline" gap="small">
+                <s-stack direction="inline" gap="base">
                   <s-text-field
                     label="ZIP / Postal code"
                     value={state.order?.shippingAddress?.zip ?? ""}
@@ -416,6 +470,7 @@ export function InlineOrderEditor() {
                 />
 
                 <s-button
+                  variant="secondary"
                   onClick={() =>
                     mutate("update-shipping", {
                       shipFirstName: state.order?.shippingAddress?.firstName ?? "",
@@ -431,73 +486,68 @@ export function InlineOrderEditor() {
                 >
                   Save shipping
                 </s-button>
-              </s-stack>
-                </s-details>
-              </s-box>
+              </EditAccordion>
             ) : null}
 
-            <s-box border="base" borderRadius="base" padding="base" minInlineSize="100%">
-              <s-details >
-                <s-summary>Edit gift note</s-summary>
-              <s-stack gap="small">
-                <s-text-area
-                  label="Gift note"
-                  value={state.order?.note || ""}
-                  onChange={(event) =>
-                    setState((prev) => ({...prev, order: {...prev.order, note: event.currentTarget.value}}))
-                  }
-                />
-                <s-button onClick={() => mutate("update-gift-note", {giftNote: state.order?.note || ""})}>
-                  Save gift note
-                </s-button>
+            <EditAccordion icon="gift-card" title="Edit gift note">
+              <s-text-area
+                label="Gift note"
+                value={state.order?.note || ""}
+                onChange={(event) =>
+                  setState((prev) => ({...prev, order: {...prev.order, note: event.currentTarget.value}}))
+                }
+              />
+              <s-button variant="secondary" onClick={() => mutate("update-gift-note", {giftNote: state.order?.note || ""})}>
+                Save gift note
+              </s-button>
+            </EditAccordion>
+
+            <EditAccordion icon="reorder" title="Update products — variant and quantity">
+              <s-stack gap="large">
+                {state.lines.map((line) => {
+                  const lineDraft = draft.lineChanges.find((item) => item.lineItemId === line.id);
+                  const variants = ensureVariantOptions(line);
+                  const selectedVariant =
+                    lineDraft?.nextVariantId || line.variantId || variants[0]?.id || "";
+
+                  return (
+                    <s-box key={line.id} border="base" borderRadius="base" padding="base" background="base">
+                      <s-stack gap="base">
+                        <s-text>{line.title}</s-text>
+                        <s-text type="small" tone="neutral">
+                          Current: {line.variantTitle}
+                        </s-text>
+                        <s-select
+                          label="Variant"
+                          value={selectedVariant}
+                          onChange={(event) =>
+                            patchLine(line.id, {
+                              nextVariantId: event.currentTarget.value,
+                            })
+                          }
+                        >
+                          {variants.map((variant) => (
+                            <s-option key={variant.id} value={variant.id}>
+                              {variant.title} ({variant.price})
+                            </s-option>
+                          ))}
+                        </s-select>
+                        <s-number-field
+                          label="Quantity"
+                          value={String(lineDraft?.quantity ?? line.quantity)}
+                          min={1}
+                          max={99}
+                          onChange={(event) =>
+                            patchLine(line.id, {quantity: Math.max(1, Number(event.currentTarget.value || 1))})
+                          }
+                        />
+                      </s-stack>
+                    </s-box>
+                  );
+                })}
               </s-stack>
-              </s-details>
-            </s-box>
-
-            <s-box border="base" borderRadius="base" padding="base">
-              <s-details>
-                <s-summary>Update products — variant and quantity</s-summary>
-              <s-stack gap="small">
-            {state.lines.map((line) => {
-              const lineDraft = draft.lineChanges.find((item) => item.lineItemId === line.id);
-              const variants = ensureVariantOptions(line);
-              const selectedVariant =
-                lineDraft?.nextVariantId || line.variantId || variants[0]?.id || "";
-
-              return (
-                <s-box key={line.id} border="base" borderRadius="base" padding="base">
-                  <s-stack gap="small">
-                    <s-text>{line.title}</s-text>
-                    <s-text type="small">Current: {line.variantTitle}</s-text>
-                    <s-select
-                      label="Variant"
-                      value={selectedVariant}
-                      onChange={(event) =>
-                        patchLine(line.id, {
-                          nextVariantId: event.currentTarget.value,
-                        })
-                      }
-                    >
-                      {variants.map((variant) => (
-                        <s-option key={variant.id} value={variant.id}>
-                          {variant.title} ({variant.price})
-                        </s-option>
-                      ))}
-                    </s-select>
-                    <s-number-field
-                      label="Quantity"
-                      value={String(lineDraft?.quantity ?? line.quantity)}
-                      min={1}
-                      max={99}
-                      onChange={(event) =>
-                        patchLine(line.id, {quantity: Math.max(1, Number(event.currentTarget.value || 1))})
-                      }
-                    />
-                  </s-stack>
-                </s-box>
-              );
-            })}
               <s-button
+                variant="secondary"
                 disabled={secondsLeft <= 0 || !state.settings?.allowProductEdit}
                 onClick={() =>
                   mutate("apply-edit", {
@@ -511,16 +561,11 @@ export function InlineOrderEditor() {
               >
                 Save product changes
               </s-button>
-              </s-stack>
-              </s-details>
-            </s-box>
+            </EditAccordion>
 
             {state.settings?.enableUpsells ? (
-              <s-box border="base" borderRadius="base" padding="base">
-                <s-details>
-                  <s-summary>Add a product to your order</s-summary>
-              <s-stack gap="small">
-                <s-text type="small">
+              <EditAccordion icon="plus" title="Add a product to your order">
+                <s-text type="small" tone="neutral">
                   Add another product — pick a variant below. Merchant can configure specific addon products in the OrderFlex admin.
                 </s-text>
 
@@ -533,7 +578,7 @@ export function InlineOrderEditor() {
                     No variants are available for addon products yet. Try other products or check inventory on those items.
                   </s-banner>
                 ) : (
-                  <>
+                  <s-stack gap="base">
                     <s-select
                       label="Add another product (variant)"
                       value={draft.addVariantId || NO_UPSELL_VARIANT}
@@ -569,6 +614,7 @@ export function InlineOrderEditor() {
                       }
                     />
                     <s-button
+                      variant="secondary"
                       disabled={
                         secondsLeft <= 0 ||
                         !state.settings?.allowProductEdit ||
@@ -591,18 +637,15 @@ export function InlineOrderEditor() {
                     >
                       Add product
                     </s-button>
-                  </>
+                  </s-stack>
                 )}
-              </s-stack>
-                </s-details>
-              </s-box>
+              </EditAccordion>
             ) : null}
 
           </s-stack>
         ) : null}
       </s-stack>
-      </s-section>
-   
+    </s-section>
   );
 }
 
